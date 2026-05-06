@@ -220,6 +220,7 @@ $(SOURCES)/sdl2_image/cmakebuild/Makefile: $(SOURCES)/sdl2_image/CMakeLists.txt
 	cd $(SOURCES)/sdl2_image; mkdir -p cmakebuild; cd cmakebuild; \
 	$(CMAKE) \
 	-DBUILD_SHARED_LIBS=no \
+	-DSDL2IMAGE_SAMPLES=no \
 	-DSDL2IMAGE_JPG_SAVE=yes \
 	-DSDL2IMAGE_PNG_SAVE=yes \
 	-DSDL2IMAGE_PNG_SHARED=no \
