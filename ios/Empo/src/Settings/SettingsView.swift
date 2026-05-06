@@ -16,11 +16,16 @@ struct SettingsView: View {
             Form {
                 Section {
                     VStack(spacing: Spacing.md) {
+                        Image(.empoMark)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 64, height: 64)
+                            .foregroundStyle(.brand)
                         // Match splash screen wordmark styling so the
                         // first run and the settings header feel
-                        // continuous.
+                        // continuous, scaled down to fit the sheet.
                         Text(AppInfo.name)
-                            .font(AppFont.wordmark)
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
                         // Tap the marketing version to reveal full build
                         // details (commit, dirty flag, non-default branch).
                         Button {
