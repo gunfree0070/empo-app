@@ -15,6 +15,11 @@ class AppState {
     var selectedGame: GameEntry?
     var errorMessage: String?
     var engineReady = false
+    /// Set when an error alert fires during a `.loading` session
+    /// and stays true until the next `selectGame`. The loading
+    /// view reads this after the user dismisses the alert to
+    /// switch from spinner to error content.
+    var sessionHadError = false
     private var terminationExpected = false
 
     private let crashTracker = CrashTracker()
@@ -37,6 +42,7 @@ class AppState {
         guard phase == nil, pauseManager.pausedGame == nil else { return }
         guard let container = game.container else { return }
         selectedGame = game
+        sessionHadError = false
         // Bind the controls layout to this game so edits during play
         // persist to this game's per-game slot (not a global one).
         ControlsLayout.shared.switchGame(id: game.id)
@@ -373,6 +379,9 @@ class AppState {
                                 cleanExit
                                 ? AppState.cleanExitMessage
                                 : AppState.crashMessage
+                        }
+                        if state.phase == .loading {
+                            state.sessionHadError = true
                         }
                         state.selectedGame = nil
                         ControlsLayout.shared.switchGame(id: nil)

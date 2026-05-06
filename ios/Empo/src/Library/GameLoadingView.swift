@@ -59,21 +59,24 @@ struct GameLoadingView: View {
             bannerBackground
 
             VStack(spacing: Spacing.xl) {
-                Text(game.title)
-                    .font(.title)
-                    .fontWeight(.bold)
-                    .foregroundStyle(.white)
-                    .heroTitleShadow()
-                    .opacity(titleVisible ? 1 : 0)
-                    .offset(y: titleVisible ? 0 : 12)
+                if showErrorContent {
+                    errorContent
+                } else {
+                    Text(game.title)
+                        .font(.title)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.white)
+                        .opacity(titleVisible ? 1 : 0)
+                        .offset(y: titleVisible ? 0 : 12)
 
-                ProgressView()
-                    .progressViewStyle(.circular)
-                    .tint(.white)
-                    .scaleEffect(1.2)
-                    .accessibilityLabel("Loading game")
-                    .opacity(spinnerVisible ? 1 : 0)
-                    .offset(y: spinnerVisible ? 0 : 12)
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .tint(.white)
+                        .scaleEffect(1.2)
+                        .accessibilityLabel("Loading game")
+                        .opacity(spinnerVisible ? 1 : 0)
+                        .offset(y: spinnerVisible ? 0 : 12)
+                }
             }
         }
         .overlay(alignment: .bottom) {
@@ -118,9 +121,55 @@ struct GameLoadingView: View {
         }
     }
 
+    /// True when an error fired during this loading session and the
+    /// user has dismissed the alert. Switches the loading view's
+    /// inner content from `<title> + spinner` to a stable error
+    /// message so the user isn't left staring at a perpetual
+    /// spinner after acknowledging "OK".
+    private var showErrorContent: Bool {
+        appState.sessionHadError && appState.errorMessage == nil
+    }
+
+    private var errorContent: some View {
+        VStack(spacing: Spacing.md) {
+            Text("Error occurred")
+                .font(.title)
+                .fontWeight(.bold)
+                .foregroundStyle(.white)
+
+            Text("An unexpected error happened when trying to start \(game.title).")
+                .font(.system(size: 15))
+                .foregroundStyle(.white.opacity(0.85))
+                .multilineTextAlignment(.center)
+
+            Text("Please restart Empo and try again.")
+                .font(.system(size: 15))
+                .foregroundStyle(.white.opacity(0.85))
+                .multilineTextAlignment(.center)
+
+            // The GitHub link routes to the issues page since that's
+            // the actionable surface for "the error keeps happening"
+            // - filing a bug report, not browsing the repo.
+            (Text("If the error keeps happening, please open an issue on ")
+                + Text("[GitHub](\(GitInfo.issuesURL))")
+                    .foregroundColor(.brand)
+                + Text("."))
+                .font(.system(size: 15))
+                .foregroundStyle(.white.opacity(0.85))
+                .multilineTextAlignment(.center)
+                .tint(.brand)
+        }
+        .padding(.horizontal, Spacing.xl)
+        .transition(.opacity)
+    }
+
     @ViewBuilder
     private var cancelButton: some View {
-        if cancelVisible {
+        // Suppress the hint once an error alert is presenting or the
+        // error content has taken over: RootView is showing the user
+        // what to do, so the "if loading is stuck..." line just
+        // clutters the screen.
+        if cancelVisible && appState.errorMessage == nil && !showErrorContent {
             // Previously a "Quit to library" button that called
             // returnToLibrary + a hard-deadline force-quit helper.
             // Replaced with a static label because:
