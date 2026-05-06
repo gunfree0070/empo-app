@@ -68,14 +68,26 @@ fi
 
 # Ad-hoc sign with our entitlements file so the Mach-O has an
 # entitlements blob embedded. Sideloaders that resign the IPA
-# (AltStore, Sideloadly, ESign) read this blob as their template;
-# without it some resigners (notably ESign) synthesize an
-# incomplete blob that breaks the document picker's sandbox-
-# extension grants on picked URLs. iOS won't trust the ad-hoc
+# (AltStore, Sideloadly, ESign, Feather) read this blob as their
+# template; without it some resigners synthesize an incomplete
+# blob and break runtime behaviors. iOS won't trust the ad-hoc
 # signature directly, but every sideloader re-signs over it with
 # the user's cert before installing.
+#
+# `--generate-entitlement-der` writes the modern DER-encoded
+# entitlements format alongside the plist form. Required by
+# iOS 15+ for some entitlement keys to be honored, and makes
+# the signature easier for naive resigners to round-trip
+# without losing data.
+#
+# `--options=runtime` enables the hardened runtime flag. Mostly
+# a macOS thing (hardened runtime restricts JIT, debugger
+# attachment, etc.), but setting it here keeps the signature
+# shape consistent with what App Store builds emit.
 echo "==> ad-hoc signing with entitlements"
 codesign --force --sign - \
+    --options=runtime \
+    --generate-entitlement-der \
     --entitlements "$PROJECT_DIR/Empo.entitlements" \
     "$APP_PATH"
 
