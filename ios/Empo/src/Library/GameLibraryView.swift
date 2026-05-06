@@ -334,7 +334,7 @@ struct GameLibraryView: View {
 
     private var emptyStateContent: some View {
         EmptyStateView(
-            icon: "gamecontroller",
+            icon: Image(.empoMark),
             title: "No Games Yet",
             subtitle: "Add your favorite RPG Maker\ngames to get started!",
             revealed: splashDismissed,

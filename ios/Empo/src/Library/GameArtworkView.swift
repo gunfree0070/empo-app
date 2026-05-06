@@ -4,7 +4,7 @@ import SwiftUI
 /// for `.fill` aspect ratio to clip correctly.
 struct GameArtworkView: View {
     let artworkPath: String?
-    var placeholderIcon: String = "gamecontroller.fill"
+    var placeholderIcon: Image = Image(.empoMark)
     var placeholderIconSize: CGFloat = 36
     var size: CGFloat?
     var cornerRadius: CGFloat = 0
@@ -86,8 +86,10 @@ struct GameArtworkView: View {
     private var placeholderContent: some View {
         ZStack {
             placeholderBackground
-            Image(systemName: placeholderIcon)
-                .font(.system(size: placeholderIconSize))
+            placeholderIcon
+                .resizable()
+                .scaledToFit()
+                .frame(width: placeholderIconSize, height: placeholderIconSize)
                 .foregroundStyle(.quaternary)
         }
     }

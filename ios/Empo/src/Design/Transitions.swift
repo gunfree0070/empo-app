@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct EmptyStateView: View {
-    let icon: String
+    let icon: Image
     let title: String
     let subtitle: String
     var revealed: Bool = true
@@ -16,8 +16,10 @@ struct EmptyStateView: View {
 
     var body: some View {
         VStack(spacing: Spacing.lg) {
-            Image(systemName: icon)
-                .font(.system(size: IconSize.emptyState))
+            icon
+                .resizable()
+                .scaledToFit()
+                .frame(width: IconSize.emptyState, height: IconSize.emptyState)
                 .foregroundStyle(.secondary)
                 .offset(y: floating ? -3 : 3)
                 .animation(Motion.float, value: floating)

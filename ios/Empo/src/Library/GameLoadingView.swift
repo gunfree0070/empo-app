@@ -184,7 +184,7 @@ struct GameLoadingView: View {
                 .overlay(Color.black.opacity(Scrim.medium))
         } else {
             // No banner: fall through to the unified placeholder
-            // (gradient + gamecontroller glyph). The Game Info
+            // (gradient + Empo mark). The Game Info
             // sheet's banner uses the same fallback so the two
             // surfaces match - this view just blurs + darkens the
             // result. Skip the Ken Burns / blur path here because

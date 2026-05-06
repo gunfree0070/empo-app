@@ -484,7 +484,7 @@ struct GameInfoView: View {
                 .frame(height: bannerHeight)
         } else {
             // No banner: fall through to the unified placeholder
-            // (gradient + gamecontroller glyph). The artwork path
+            // (gradient + Empo mark). The artwork path
             // used to back-fill here, but the design rule is that
             // banner == loading-view backdrop, just larger / not
             // blurred, so the two surfaces stay visually
@@ -503,7 +503,7 @@ struct GameInfoView: View {
 
     /// Foreground artwork tile that floats over the banner. Routed
     /// through `GameArtworkView` so the placeholder matches the
-    /// rest of the library (gradient + gamecontroller glyph), and
+    /// rest of the library (gradient + Empo mark), and
     /// custom artwork picks up the same icon-composite handling
     /// that grid/list cards already use for transparent PE icons.
     private var artworkView: some View {
