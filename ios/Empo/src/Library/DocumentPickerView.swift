@@ -21,8 +21,22 @@ struct DocumentPickerView: UIViewControllerRepresentable {
     var onPick: ([URL]) -> Void
 
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
+        // `asCopy: true`: iOS copies the picked file/folder into our
+        // app's tmp directory and hands us a regular file:// URL,
+        // no security-scoped resource involved. We extract / copy
+        // game files immediately on import anyway, so the security
+        // scope was never load-bearing.
+        //
+        // Why this matters for sideloaded installs: on-device
+        // resigners (ESign, Feather/Zsign with empty entitlements
+        // path) drop the entitlements blob during resign. Without
+        // entitlements iOS won't grant the app a sandbox extension
+        // for the picked URL, so the security-scoped picker hangs
+        // (folder: spinner forever) or silently no-ops (file: Open
+        // does nothing). asCopy bypasses that whole grant flow.
         let picker = UIDocumentPickerViewController(
-            forOpeningContentTypes: [.folder, .zip, .sevenZArchive, .rarArchive, .jgpArchive]
+            forOpeningContentTypes: [.folder, .zip, .sevenZArchive, .rarArchive, .jgpArchive],
+            asCopy: true
         )
         picker.allowsMultipleSelection = true
         picker.delegate = context.coordinator
