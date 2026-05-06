@@ -80,13 +80,12 @@ fi
 # the signature easier for naive resigners to round-trip
 # without losing data.
 #
-# `--options=runtime` enables the hardened runtime flag. Mostly
-# a macOS thing (hardened runtime restricts JIT, debugger
-# attachment, etc.), but setting it here keeps the signature
-# shape consistent with what App Store builds emit.
+# Don't pass `--options=runtime`: hardened runtime is a macOS
+# concept (restricts JIT/dyld/debugger), and setting it on an
+# iOS binary makes dyld refuse to load the Mach-O at app
+# launch, producing a black screen on startup.
 echo "==> ad-hoc signing with entitlements"
 codesign --force --sign - \
-    --options=runtime \
     --generate-entitlement-der \
     --entitlements "$PROJECT_DIR/Empo.entitlements" \
     "$APP_PATH"
