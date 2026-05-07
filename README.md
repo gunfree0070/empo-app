@@ -14,11 +14,11 @@ The name's from *emporos*, ancient Greek for a traveler riding on someone else's
 
 Import a game and play it:
 
-<video src="https://github.com/mateo-m/empo-app/raw/main/docs/media/demo.mp4" controls width="600"></video>
+https://github.com/user-attachments/assets/d19e44ff-c2ef-435f-b2fe-60f1c97890c8
 
 Library view:
 
-<video src="https://github.com/mateo-m/empo-app/raw/main/docs/media/demo-library.mp4" controls width="600"></video>
+https://github.com/user-attachments/assets/1a6de8a7-b47c-4ad4-8df9-f028347dfb9c
 
 In-game battle:
 
