@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/media/empo-icon.png" alt="Empo icon" width="160" /></p>
+
 # Empo
 
 > Run RPG Maker games on iPhone and iPad.
