@@ -60,6 +60,12 @@ End-to-end working across RGSS1/2/3 games and modern mkxp-z forks. Per-game comp
 
 Pre-built unsigned `.ipa` files are attached to each tagged release on the [Releases page](https://github.com/mateo-m/empo-app/releases). Install with [AltStore](https://altstore.io), [Sideloadly](https://sideloadly.io), or sign yourself if you have an Apple Developer account.
 
+AltStore / SideStore users can add Empo as a source for native update notifications:
+
+```
+https://raw.githubusercontent.com/mateo-m/empo-app/main/altstore-source.json
+```
+
 ### Limitations
 
 - **Single game per session.** After exiting a game, force-close + reopen Empo from the app switcher to start a different one. Cross-session play is parked pending reliable Ruby state cleanup; see [`docs/multi-session.md`](docs/multi-session.md).

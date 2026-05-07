@@ -4,6 +4,12 @@ struct SettingsView: View {
     @Environment(\.appSettings) private var settings
     @Environment(\.dismiss) private var dismiss
     @State private var showBuildInfo = false
+    /// Latest known release status. Driven by `UpdateChecker` on
+    /// view appear (uses its 6-hour cache so opening Settings
+    /// repeatedly doesn't hammer the GitHub API). Hidden entirely
+    /// on App Store / TestFlight installs since the platform
+    /// handles updates there.
+    @State private var updateStatus: UpdateChecker.Status = .unknown
 
     // ExperimentalFeature toggles + ConfirmSheet/InfoSheet were
     // deleted alongside the gamePause/cheats graduation - see the
@@ -159,6 +165,18 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    if UpdateChecker.isSideloadOrDevBuild {
+                        UpdateCheckRow(
+                            status: updateStatus,
+                            onTapRetry: {
+                                Task {
+                                    updateStatus = .checking
+                                    updateStatus = await UpdateChecker.checkNow()
+                                }
+                            }
+                        )
+                    }
+
                     NavigationLink {
                         LicensesView()
                     } label: {
@@ -240,6 +258,11 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showBuildInfo) {
                 BuildInfoSheet()
+            }
+            .task {
+                guard UpdateChecker.isSideloadOrDevBuild else { return }
+                updateStatus = .checking
+                updateStatus = await UpdateChecker.checkIfStale()
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)

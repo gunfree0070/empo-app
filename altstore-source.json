@@ -1,0 +1,45 @@
+{
+  "name": "Empo",
+  "subtitle": "Run RPG Maker games on iPhone and iPad.",
+  "description": "Empo wraps the mkxp-z RPG Maker engine in a native SwiftUI library and a customizable touch-controls overlay. RPG Maker XP / VX / VX Ace games and modern Pokemon Essentials forks run on-device, no desktop emulator needed.",
+  "iconURL": "https://raw.githubusercontent.com/mateo-m/empo-app/main/docs/media/empo-icon.png",
+  "website": "https://github.com/mateo-m/empo-app",
+  "tintColor": "#FA8F29",
+  "featuredApps": ["sh.mateo.empo"],
+  "apps": [
+    {
+      "name": "Empo",
+      "bundleIdentifier": "sh.mateo.empo",
+      "developerName": "Mateo M.",
+      "subtitle": "Run RPG Maker games on iPhone and iPad.",
+      "localizedDescription": "Empo wraps the mkxp-z RPG Maker engine in a native SwiftUI library and a customizable touch-controls overlay. RPG Maker XP / VX / VX Ace games and modern Pokemon Essentials forks run on-device, no desktop emulator needed.\n\nFeatures:\n- Plays games made for RGSS1 (XP), RGSS2 (VX), RGSS3 (VX Ace), and modern mkxp-z forks\n- Multi-Ruby native dispatch (1.8, 1.9, 3.1) with auto-detection\n- Imports games from folders, .zip, .7z, .rar, and JoiPlay's .jgp format\n- Customizable on-screen D-pad and action buttons, with per-game layouts\n- Pause and resume from the library with a hero zoom transition\n- Library with sort, search, grid/list views, and bulk delete",
+      "iconURL": "https://raw.githubusercontent.com/mateo-m/empo-app/main/docs/media/empo-icon.png",
+      "tintColor": "#FA8F29",
+      "category": "games",
+      "screenshots": [
+        "https://raw.githubusercontent.com/mateo-m/empo-app/main/docs/media/demo-cinematic.png",
+        "https://raw.githubusercontent.com/mateo-m/empo-app/main/docs/media/demo-battle.png",
+        "https://raw.githubusercontent.com/mateo-m/empo-app/main/docs/media/demo-overworld.png"
+      ],
+      "versions": [
+        {
+          "version": "0.1.0",
+          "buildVersion": "1",
+          "date": "2026-05-07",
+          "localizedDescription": "First public build.",
+          "downloadURL": "https://github.com/mateo-m/empo-app/releases/download/v0.1.0/Empo-0.1.0-unsigned.ipa",
+          "size": 14985878,
+          "minOSVersion": "26.0"
+        }
+      ],
+      "appPermissions": {
+        "entitlements": [],
+        "privacy": {
+          "NSBluetoothAlwaysUsageDescription": "Game controllers may connect over Bluetooth.",
+          "NSCameraUsageDescription": "Take a photo to use as custom game artwork or banner."
+        }
+      }
+    }
+  ],
+  "news": []
+}
