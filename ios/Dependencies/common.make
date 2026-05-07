@@ -959,6 +959,21 @@ $(LIBDIR)/libruby19-static.a: $(SOURCES)/ruby19/Makefile
 	mkdir -p $(INCLUDEDIR)/ruby19; \
 	cp -R include/* $(INCLUDEDIR)/ruby19/; \
 	cp .ext/include/aarch64-darwin/ruby/config.h $(INCLUDEDIR)/ruby19/ruby/config.h 2>/dev/null || true
+	@# Compile our PAC-free arm64 setjmp/longjmp replacement and
+	@# inject it into libruby19-static.a. Same rationale as the
+	@# Ruby 1.8 fix: Apple's _setjmp signs LR with PACIBSP using
+	@# SP as the modifier; longjmp verifies via AUTIBSP. Ruby's
+	@# fiber implementation longjmps onto a different stack
+	@# (Fiber.new allocates per-fiber stack regions and swaps
+	@# SP), so PAC verification fails. Symptom on iOS 26+ is
+	@# heap corruption traps in xzone_malloc on the first malloc
+	@# after a fiber switch. config.h is sed'd in the Makefile
+	@# rule below to point RUBY_SETJMP / RUBY_LONGJMP at our
+	@# symbols.
+	$(CC) $(TARGETFLAGS) -c ${PWD}/ruby19/mkxp_setjmp_arm64.S \
+		-o $(SOURCES)/ruby19/mkxp_setjmp_arm64.o
+	$(AR) rcs $(LIBDIR)/libruby19-static.a $(SOURCES)/ruby19/mkxp_setjmp_arm64.o
+	$(RANLIB) $(LIBDIR)/libruby19-static.a
 	@# Build extensions (mirrors the Ruby 1.8 pattern; see
 	@# libruby18-static.a recipe). Adds our hand-rolled extinit.c
 	@# which provides the real Init_ext() calling each Init_X.
@@ -1000,6 +1015,23 @@ $(SOURCES)/ruby19/Makefile: $(SOURCES)/ruby19/configure
 		ac_cv_func_fork=no; \
 	sed -i '' 's|^BASERUBY = ruby$$|BASERUBY = ruby --disable=gems|' Makefile; \
 	sed -i '' 's|^MINIRUBY = ruby |MINIRUBY = ruby --disable=gems |' Makefile
+	@# Override config.h's RUBY_SETJMP / RUBY_LONGJMP to point at
+	@# our PAC-free arm64 setjmp variant (see mkxp_setjmp_arm64.S).
+	@# Configure picks `_setjmp` based on HAVE__SETJMP detection;
+	@# Apple's `_setjmp` signs LR with PAC, breaking Ruby's fiber
+	@# stack-swapping. Our replacement uses raw LR save/restore.
+	@# `returns_twice` tells the compiler the call may resume
+	@# control flow at the call site so locals stay reload-safe.
+	CONFIG_H=$(SOURCES)/ruby19/.ext/include/aarch64-darwin/ruby/config.h; \
+	if [ -f $$CONFIG_H ]; then \
+	    sed -i '' \
+	        -e 's|^#define RUBY_SETJMP(env) _setjmp(env)$$|#define RUBY_SETJMP(env) mkxp_ruby19_setjmp(env)|' \
+	        -e 's|^#define RUBY_LONGJMP(env,val) _longjmp(env,val)$$|#define RUBY_LONGJMP(env,val) mkxp_ruby19_longjmp(env,val)|' \
+	        $$CONFIG_H; \
+	    echo '' >> $$CONFIG_H; \
+	    echo 'extern int  mkxp_ruby19_setjmp(void *env) __attribute__((returns_twice));' >> $$CONFIG_H; \
+	    echo 'extern void mkxp_ruby19_longjmp(void *env, int val) __attribute__((noreturn));' >> $$CONFIG_H; \
+	fi
 
 $(SOURCES)/ruby19/configure: $(SOURCES)/ruby19/configure.in
 	cd $(SOURCES)/ruby19; \
