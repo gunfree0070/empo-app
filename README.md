@@ -10,6 +10,22 @@ Empo wraps the [mkxp-z](https://github.com/mkxp-z/mkxp-z) RPG Maker engine in a 
 
 The name's from *emporos*, ancient Greek for a traveler riding on someone else's ship.
 
+## Demo
+
+Full walkthrough from splash and disclaimer through the library into Pokemon Z gameplay:
+
+<video src="https://github.com/mateo-m/empo-app/raw/main/docs/media/demo.mp4" controls width="600"></video>
+
+The library and its hero zoom transition into an active session:
+
+<video src="https://github.com/mateo-m/empo-app/raw/main/docs/media/demo-library.mp4" controls width="600"></video>
+
+In-engine rendering across a cinematic intro, a battle, and free-roam overworld:
+
+| Cinematic | Battle | Overworld |
+| :-: | :-: | :-: |
+| ![Cinematic](docs/media/demo-cinematic.png) | ![Battle](docs/media/demo-battle.png) | ![Overworld](docs/media/demo-overworld.png) |
+
 ## Table of Contents
 
 - [Highlights](#highlights)
@@ -26,7 +42,7 @@ The name's from *emporos*, ancient Greek for a traveler riding on someone else's
 ## Highlights
 
 - Plays games made for RGSS1 (XP), RGSS2 (VX), RGSS3 (VX Ace), and modern mkxp-z forks.
-- **Multi-Ruby native dispatch.** Four Ruby interpreters (1.8, 1.9, 3.0, 3.1) ship in one binary; each game runs on the actual Ruby version it was authored against. See [`docs/multi-ruby.md`](docs/multi-ruby.md).
+- **Multi-Ruby native dispatch.** Three Ruby interpreters (1.8, 1.9, 3.1) ship in one binary; each game runs on the Ruby version it was authored against. Modern Pokemon Essentials forks shipping a `ruby300.dll` route to 3.1 with the syntax-transform compatibility mode. See [`docs/multi-ruby.md`](docs/multi-ruby.md).
 - Imports games from folders, `.zip`, `.7z`, `.rar`, and JoiPlay's `.jgp` format.
 - Customizable on-screen D-pad and action buttons, with per-game layouts.
 - Pause and resume from the library; a frozen-frame snapshot bridges SDL into the SwiftUI hero zoom transition.

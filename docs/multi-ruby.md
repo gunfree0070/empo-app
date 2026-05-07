@@ -2,7 +2,7 @@
 
 ## Overview
 
-Empo ships four Ruby interpreters in one binary - 1.8.8, 1.9.3, 3.0.7, 3.1.3 - and dispatches to the right one per-game at launch. A vintage RPG Maker XP game runs on actual Ruby 1.8's parser and VM. A modern Pokemon Essentials fork built on the mkxp-z runtime routes to Ruby 3.1. Ruby 3.0 ships too and is available as a manual override via the per-game Ruby Version picker for runtimes built against 3.0 specifically.
+Empo ships three Ruby interpreters in one binary - 1.8.8, 1.9.3, 3.1.3 - and dispatches to the right one per-game at launch. A vintage RPG Maker XP game runs on actual Ruby 1.8's parser and VM. A modern Pokemon Essentials fork built on the mkxp-z runtime routes to Ruby 3.1, with the syntax-transform compatibility mode applied for the legacy game-script idioms PE relies on. Modern forks shipping `x64-msvcrt-ruby300.dll` are folded onto the same 3.1 dispatch (the syntax-transform parser patches only exist in the 3.1 source, so a separate 3.0 build was a silent no-op for legacy compatibility and was dropped).
 
 This replaces the older "everything on one Ruby" architecture (originally 1.8-only, briefly 3.1-only via the syntax-transform PR304 experiment).
 
@@ -15,7 +15,7 @@ Different RPG Maker generations target different Ruby versions:
 | RGSS1 (RPG Maker XP) | `RGSS104E.dll` | 1.8 | Vintage Pokemon Essentials forks |
 | RGSS2 (RPG Maker VX) | `RGSS200J.dll` | 1.9 | A handful of community projects |
 | RGSS3 (RPG Maker VX Ace) | `RGSS300.dll` | 1.9 | Traditional VX Ace games |
-| mkxp-z modern | bundled `x64-msvcrt-rubyXYZ.dll` | 3.0 / 3.1 | Modern Pokemon Essentials forks shipping the mkxp-z runtime |
+| mkxp-z modern | bundled `x64-msvcrt-rubyXYZ.dll` | 3.1 | Modern Pokemon Essentials forks shipping the mkxp-z runtime; bundles for 3.0 are folded onto 3.1 + Legacy compatibility |
 
 A single Ruby version that tries to cover all of these is fragile. Ruby 1.8 can't parse modern code (keyword args, safe nav, pattern matching). Ruby 3.x can't parse a lot of vintage code (`when X:`, character literal arithmetic, removed `Object#id`). Source-rewrite hacks like the syntax-transform patches make 3.1 accept some 1.8 grammar but break in subtle ways for genuinely modern games (see [Syntax transform](#syntax-transform) below).
 
@@ -31,7 +31,6 @@ Each Ruby version's binding code + libruby + extensions are linked into a single
 ios/Dependencies/build-${SDK}/lib/
   mkxp18-merged.o   exports: _mkxp_get_script_binding_18
   mkxp19-merged.o   exports: _mkxp_get_script_binding_19
-  mkxp30-merged.o   exports: _mkxp_get_script_binding_30
   mkxp31-merged.o   exports: _mkxp_get_script_binding_31
 ```
 
