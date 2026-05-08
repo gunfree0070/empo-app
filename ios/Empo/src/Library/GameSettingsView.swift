@@ -661,7 +661,8 @@ struct GameSettingsView: View {
     /// while the scan is still running in the background.
     private var autoDetectCompatLabel: String {
         guard let modern = autoDetectedModernScripts else { return "Auto-detect" }
-        let resolved = modern
+        let resolved =
+            modern
             ? CompatibilityPick.modern.displayLabel
             : CompatibilityPick.legacy.displayLabel
         return "Auto-detect (\(resolved))"

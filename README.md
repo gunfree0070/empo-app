@@ -62,7 +62,7 @@ Pre-built unsigned `.ipa` files are attached to each tagged release on the [Rele
 
 AltStore / SideStore users can add Empo as a source for native update notifications:
 
-```
+```text
 https://raw.githubusercontent.com/mateo-m/empo-app/main/altstore-source.json
 ```
 

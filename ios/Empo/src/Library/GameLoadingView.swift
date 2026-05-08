@@ -152,7 +152,7 @@ struct GameLoadingView: View {
             // - filing a bug report, not browsing the repo.
             (Text("If the error keeps happening, please open an issue on ")
                 + Text("[GitHub](\(GitInfo.issuesURL))")
-                    .foregroundColor(.brand)
+                .foregroundColor(.brand)
                 + Text("."))
                 .font(.system(size: 15))
                 .foregroundStyle(.white.opacity(0.85))
