@@ -9,10 +9,29 @@ settings:
     MARKETING_VERSION: 0.1.0
     CURRENT_PROJECT_VERSION: 1
     CLANG_CXX_LANGUAGE_STANDARD: c++14
-    CLANG_ENABLE_OBJC_ARC: YES
-    CLANG_ENABLE_MODULES: NO
+    # `YES` / `NO` are Xcode's canonical boolean tokens for build
+    # settings; xcodebuild's parser treats them specially. yamllint
+    # would prefer lower-case, but lowercasing here risks subtle
+    # parser quirks downstream, so disable the rule for these lines.
+    CLANG_ENABLE_OBJC_ARC: YES # yamllint disable-line rule:truthy
+    CLANG_ENABLE_MODULES: NO # yamllint disable-line rule:truthy
     OTHER_CFLAGS: -fdeclspec
-    WARNING_CFLAGS: "-Wno-documentation -Wno-shorten-64-to-32 -Wno-deprecated-declarations -Wno-uninitialized -Wno-conditional-uninitialized -Wno-undefined-var-template -Wno-comma -Wno-switch -Wno-unused-const-variable -Wno-deprecated-literal-operator -Wno-unused-function"
+    # Folded scalar (`>-`) collapses newlines into single spaces so
+    # the resulting build setting is one whitespace-separated string,
+    # matching what xcodebuild expects for `WARNING_CFLAGS`. Listing
+    # one flag per line keeps the diff readable when toggling them.
+    WARNING_CFLAGS: >-
+      -Wno-documentation
+      -Wno-shorten-64-to-32
+      -Wno-deprecated-declarations
+      -Wno-uninitialized
+      -Wno-conditional-uninitialized
+      -Wno-undefined-var-template
+      -Wno-comma
+      -Wno-switch
+      -Wno-unused-const-variable
+      -Wno-deprecated-literal-operator
+      -Wno-unused-function
     DEPENDENCY_SEARCH_PATH: $(PROJECT_DIR)/../Dependencies/build-$(PLATFORM_NAME)-arm64
     HEADER_SEARCH_PATHS:
       - $(PROJECT_DIR)/../../mkxp-z-apple-mobile
@@ -77,7 +96,7 @@ settings:
       # output despite the binding being registered.
       - HM7_HAVE_MKXP_BITMAP
     ARCHS: arm64
-    ONLY_ACTIVE_ARCH: YES
+    ONLY_ACTIVE_ARCH: YES # yamllint disable-line rule:truthy
   configs:
     Release:
       OTHER_CFLAGS: "-fdeclspec -O3"
