@@ -1,6 +1,6 @@
-<p align="center"><a href="https://empo.mateo.sh"><img src="docs/media/empo-icon.png" alt="Empo icon" width="160" /></a></p>
+<p align="center"><a href="https://discord.gg/wRjRgzK2mC"><img src="docs/media/empo-icon.png" alt="Empo icon" width="160" /></a></p>
 
-# <p align="center"><a href="https://empo.mateo.sh">Empo</a></p>
+# <p align="center"><a href="https://discord.gg/wRjRgzK2mC">Empo</a></p>
 
 > <p align="center">Run RPG Maker games on iPhone and iPad.</p>
 
@@ -9,6 +9,8 @@
   <a href="#status"><img alt="Status" src="https://img.shields.io/badge/status-pre--release-yellow.svg" /></a>
   <a href="#requirements"><img alt="Platform" src="https://img.shields.io/badge/platform-iOS%2026%2B-lightgrey.svg" /></a>
 </p>
+
+<p align="center"><a href="https://discord.gg/wRjRgzK2mC">Discord</a></p>
 
 Empo wraps the [mkxp-z](https://github.com/mkxp-z/mkxp-z) RPG Maker engine in a native SwiftUI library and a customizable touch-controls overlay. RPG Maker XP / VX / VX Ace games and modern Pokemon Essentials forks run on-device, no desktop emulator needed.
 
