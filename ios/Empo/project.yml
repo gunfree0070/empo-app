@@ -395,6 +395,8 @@ targets:
           - $(DEPENDENCY_SEARCH_PATH)/lib/mkxp18-merged.o
           - $(DEPENDENCY_SEARCH_PATH)/lib/mkxp19-merged.o
           - $(DEPENDENCY_SEARCH_PATH)/lib/mkxp31-merged.o
+          - -lssl
+          - -lcrypto
           - -ldl
           - -lpthread
           - -framework Foundation
