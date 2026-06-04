@@ -15,7 +15,7 @@ ios/Dependencies/Frameworks/
 
 # Game data - user-provided + assembled at build time.
 ios/Empo/Assets.bundle/
-demo/games/
+demo/
 
 # Curated patches are JSON the engine consumes verbatim; safe to
 # format but the patches themselves are user-written regex strings,
