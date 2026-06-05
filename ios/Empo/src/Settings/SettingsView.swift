@@ -20,34 +20,7 @@ struct SettingsView: View {
         @Bindable var settings = settings
         return NavigationStack {
             Form {
-                Section {
-                    VStack(spacing: Spacing.md) {
-                        Image(.empoMark)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 64, height: 64)
-                            .foregroundStyle(.brand)
-                        // Match splash screen wordmark styling so the
-                        // first run and the settings header feel
-                        // continuous, scaled down to fit the sheet.
-                        Text(AppInfo.name)
-                            .font(.system(size: 28, weight: .bold, design: .rounded))
-                        // Tap the marketing version to reveal full build
-                        // details (commit, dirty flag, non-default branch).
-                        Button {
-                            showBuildInfo = true
-                        } label: {
-                            Text("v\(AppInfo.version)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityHint("Show build details")
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, Spacing.md)
-                    .listRowBackground(Color.clear)
-                }
+                settingsHeader
 
                 Section {
                     SettingsPicker(
@@ -165,18 +138,6 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    if UpdateChecker.isSideloadOrDevBuild {
-                        UpdateCheckRow(
-                            status: updateStatus,
-                            onTapRetry: {
-                                Task {
-                                    updateStatus = .checking
-                                    updateStatus = await UpdateChecker.checkNow()
-                                }
-                            }
-                        )
-                    }
-
                     NavigationLink {
                         LicensesView()
                     } label: {
@@ -254,7 +215,6 @@ struct SettingsView: View {
                         .frame(maxWidth: .infinity, alignment: .center)
                         .listRowBackground(Color.clear)
                 }
-
             }
             .sheet(isPresented: $showBuildInfo) {
                 BuildInfoSheet()
@@ -275,6 +235,270 @@ struct SettingsView: View {
         .tint(.brand)
     }
 
+    private var buildVersionButton: some View {
+        Button {
+            showBuildInfo = true
+        } label: {
+            Text("v\(AppInfo.version)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("Show build details")
+    }
+
+    private var settingsHeader: some View {
+        VStack(spacing: Spacing.md) {
+            Image(.empoMark)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 64, height: 64)
+                .foregroundStyle(.brand)
+            // Match splash screen wordmark styling so the
+            // first run and the settings header feel
+            // continuous, scaled down to fit the sheet.
+            Text(AppInfo.name)
+                .font(.system(size: 28, weight: .bold, design: .rounded))
+                .foregroundStyle(.primary)
+
+            VStack(spacing: Spacing.xs) {
+                buildVersionButton
+                UpdateStatusIndicator(
+                    status: updateStatus,
+                    onTapRetry: {
+                        updateStatus = .checking
+                        updateStatus = await UpdateChecker.checkNow()
+                    },
+                    size: .compact
+                )
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, Spacing.md)
+        .padding(.bottom, Spacing._3xl)
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
+        .environment(\.headerProminence, .standard)
+    }
+}
+
+struct UpdateStatusIndicator: View {
+    enum Size {
+        case compact
+        case regular
+    }
+
+    let status: UpdateChecker.Status
+    let onTapRetry: () async -> Void
+    var canDismiss: Bool = false
+    var onDismiss: (() -> Void)?
+    var size: Size = .regular
+
+    var body: some View {
+        content
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch status {
+        case .available(let latestVersion, let releaseURL):
+            UpdateStatusBadge(
+                text: "Update available: v\(latestVersion)",
+                systemImage: "arrow.down.circle.fill",
+                tint: .white,
+                background: .brand,
+                actionURL: releaseURL,
+                dismissAction: canDismiss ? onDismiss : nil,
+                usesBrandGlass: true,
+                size: size
+            )
+
+        case .upToDate:
+            UpdateStatusBadge(
+                text: "Up to date",
+                systemImage: "checkmark.circle",
+                tint: .secondary,
+                background: Color.secondary.opacity(0.12),
+                size: size
+            )
+
+        case .checking:
+            UpdateStatusBadge(
+                text: "Checking for updates...",
+                systemImage: nil,
+                tint: .secondary,
+                background: Color.secondary.opacity(0.12),
+                showsProgress: true,
+                size: size
+            )
+
+        case .failed:
+            Button {
+                Task { await onTapRetry() }
+            } label: {
+                UpdateStatusBadge(
+                    text: "Retry update check",
+                    systemImage: "exclamationmark.triangle",
+                    tint: .secondary,
+                    background: Color.secondary.opacity(0.12),
+                    size: size
+                )
+            }
+            .buttonStyle(.plain)
+
+        case .unknown:
+            EmptyView()
+        }
+    }
+}
+
+struct UpdateStatusBadge: View {
+    let text: String
+    let systemImage: String?
+    let tint: Color
+    let background: Color
+    var actionURL: URL?
+    var dismissAction: (() -> Void)?
+    var showsProgress: Bool = false
+    var usesBrandGlass: Bool = false
+    var size: UpdateStatusIndicator.Size = .regular
+
+    var body: some View {
+        Group {
+            if usesBrandGlass {
+                badgeContent
+                    .font(brandFont)
+                    .foregroundStyle(tint)
+                    .shadow(color: .black.opacity(Alpha.shadow), radius: 2, y: 1)
+                    .padding(.horizontal, brandHorizontalPadding)
+                    .padding(.vertical, brandVerticalPadding)
+                    .glassEffect(.regular.tint(background).interactive(), in: .capsule)
+                    .darkGlass()
+            } else {
+                badgeContent
+                    .font(secondaryFont)
+                    .foregroundStyle(tint)
+                    .padding(.horizontal, secondaryHorizontalPadding)
+                    .padding(.vertical, secondaryVerticalPadding)
+                    .background(background)
+                    .clipShape(Capsule())
+            }
+        }
+        .contentTransition(.numericText())
+        .fixedSize(horizontal: true, vertical: false)
+    }
+
+    private var badgeContent: some View {
+        HStack(spacing: 0) {
+            if let actionURL {
+                Link(destination: actionURL) {
+                    label
+                }
+                .buttonStyle(.plain)
+            } else {
+                label
+            }
+
+            if let dismissAction {
+                Button(action: dismissAction) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(dismissFont)
+                        .foregroundStyle(tint)
+                        .frame(width: dismissFrame, height: dismissFrame)
+                        .contentShape(Rectangle())
+                }
+                .padding(.leading, dismissLeadingPadding)
+                .buttonStyle(.plain)
+                .accessibilityLabel("Dismiss update banner")
+            }
+        }
+    }
+
+    private var label: some View {
+        HStack(spacing: Spacing.sm) {
+            if showsProgress {
+                ProgressView()
+                    .controlSize(.small)
+                    .tint(tint)
+            } else if let systemImage {
+                Image(systemName: systemImage)
+                    .imageScale(iconScale)
+            }
+
+            Text(text)
+                .lineLimit(1)
+        }
+    }
+
+    private var brandFont: Font {
+        switch size {
+        case .compact: .caption2.weight(.semibold)
+        case .regular: .subheadline.weight(.semibold)
+        }
+    }
+
+    private var secondaryFont: Font {
+        switch size {
+        case .compact: .caption.weight(.semibold)
+        case .regular: .caption.weight(.semibold)
+        }
+    }
+
+    private var brandHorizontalPadding: CGFloat {
+        switch size {
+        case .compact: Spacing.sm
+        case .regular: ButtonSize.md.horizontalPadding
+        }
+    }
+
+    private var brandVerticalPadding: CGFloat {
+        switch size {
+        case .compact: Spacing.xs
+        case .regular: Spacing.md
+        }
+    }
+
+    private var secondaryHorizontalPadding: CGFloat {
+        switch size {
+        case .compact: Spacing.sm
+        case .regular: Spacing.md
+        }
+    }
+
+    private var secondaryVerticalPadding: CGFloat {
+        switch size {
+        case .compact: Spacing.xxs
+        case .regular: Spacing.xs
+        }
+    }
+
+    private var dismissFont: Font {
+        switch size {
+        case .compact: .caption2.weight(.black)
+        case .regular: .subheadline.weight(.black)
+        }
+    }
+
+    private var dismissFrame: CGFloat {
+        switch size {
+        case .compact: 14
+        case .regular: 18
+        }
+    }
+
+    private var dismissLeadingPadding: CGFloat {
+        switch size {
+        case .compact: Spacing.xs
+        case .regular: Spacing.md
+        }
+    }
+
+    private var iconScale: Image.Scale {
+        switch size {
+        case .compact: .small
+        case .regular: .medium
+        }
+    }
 }
 
 /// Presented as a sheet when the user taps the version label in the

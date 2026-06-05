@@ -40,6 +40,8 @@ struct GameLibraryView: View {
     @State private var gameSizes: [String: Int64] = [:]
     @State private var sizesTask: Task<Void, Never>?
     @State private var importWorkflow = ImportWorkflowController()
+    @State private var updateStatus: UpdateChecker.Status = .unknown
+    @AppStorage("GameLibraryView.updateBannerDismissed") private var updateBannerDismissed = false
     /// Per-game record of which visual source triggered the most recent
     /// navigation into the player. Drives `.navigationTransition(.zoom)`
     /// so the exit animation lands on the same spot the user tapped.
@@ -153,6 +155,11 @@ struct GameLibraryView: View {
             .task {
                 refreshGameSizes()
             }
+            .task {
+                guard UpdateChecker.isSideloadOrDevBuild else { return }
+                updateStatus = .checking
+                updateStatus = await UpdateChecker.checkIfStale()
+            }
     }
 
     private var libraryPresentedContent: some View {
@@ -211,6 +218,8 @@ struct GameLibraryView: View {
             }
             .overlay(alignment: .topTrailing) { importButtonOverlay }
             .overlay(alignment: .bottom) { bulkDeleteOverlay }
+            .safeAreaInset(edge: .bottom, spacing: 0) { updateBannerInset }
+            .animation(Motion.bouncy, value: showsUpdateBanner)
     }
 
     private var libraryContentLayer: some View {
@@ -267,6 +276,22 @@ struct GameLibraryView: View {
             .ignoresSafeArea()
     }
 
+    private var showsUpdateBanner: Bool {
+        guard !selectionMode, !updateBannerDismissed else { return false }
+        guard case .available = updateStatus else { return false }
+        return true
+    }
+
+    @ViewBuilder
+    private var updateBannerInset: some View {
+        if showsUpdateBanner {
+            libraryUpdateBanner
+                .padding(.horizontal, Spacing.xl)
+                .padding(.bottom, Spacing._2xl)
+                .transition(.move(edge: .bottom).combined(with: .cardAppear))
+        }
+    }
+
     @ViewBuilder
     private var importButtonOverlay: some View {
         if !selectionMode {
@@ -302,6 +327,22 @@ struct GameLibraryView: View {
                 // library content.
                 .transition(.cardAppear)
         }
+    }
+
+    private var libraryUpdateBanner: some View {
+        UpdateStatusIndicator(
+            status: updateStatus,
+            onTapRetry: {
+                updateStatus = .checking
+                updateStatus = await UpdateChecker.checkNow()
+            },
+            canDismiss: true,
+            onDismiss: {
+                withAnimation(Motion.gentle) {
+                    updateBannerDismissed = true
+                }
+            }
+        )
     }
 
     private var emptyStateContent: some View {
