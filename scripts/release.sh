@@ -87,29 +87,7 @@ cd "$PROJECT_DIR"
 /opt/homebrew/bin/xcodegen generate --spec project.yml --project . --quiet
 cd "$REPO_ROOT"
 
-# 5. Build unsigned .ipa BEFORE we commit; the IPA's size feeds the
-# AltStore manifest update in step 7, and we want every release-flow
-# artifact to be staged into the same single chore commit so the
-# tag points at a tree consistent with the asset that ships.
-echo "==> building unsigned ipa"
-BUILD_DIR="$PROJECT_DIR/build/Release-iphoneos"
-xcodebuild \
-    -project "$PROJECT_DIR/Empo.xcodeproj" \
-    -target Empo \
-    -sdk iphoneos \
-    -arch arm64 \
-    -configuration Release \
-    CODE_SIGNING_ALLOWED=NO \
-    CONFIGURATION_BUILD_DIR="$BUILD_DIR" \
-    build 2>&1 | grep -E "^(Build|error:|warning: |CompileSwift|Ld )" || true
-
-APP_PATH="$BUILD_DIR/Empo.app"
-if [[ ! -d "$APP_PATH" ]]; then
-    echo "error: build failed - Empo.app not found at $BUILD_DIR"
-    exit 1
-fi
-
-# 6. Ad-hoc sign with our entitlements file so the Mach-O has an
+# 5. Ad-hoc sign with our entitlements file so the Mach-O has an
 # entitlements blob embedded. Sideloaders that resign the IPA
 # (AltStore, Sideloadly, ESign, Feather) read this blob as their
 # template; without it some resigners synthesize an incomplete
@@ -127,22 +105,7 @@ fi
 # concept (restricts JIT/dyld/debugger), and setting it on an
 # iOS binary makes dyld refuse to load the Mach-O at app
 # launch, producing a black screen on startup.
-echo "==> ad-hoc signing with entitlements"
-codesign --force --sign - \
-    --generate-entitlement-der \
-    --entitlements "$PROJECT_DIR/Empo.entitlements" \
-    "$APP_PATH"
-
-mkdir -p "$IPA_DIR/Payload"
-cp -R "$APP_PATH" "$IPA_DIR/Payload/Empo.app"
-IPA_NAME="Empo-${VERSION}-unsigned.ipa"
-(cd "$IPA_DIR" && zip -qr "$IPA_NAME" Payload)
-rm -rf "$IPA_DIR/Payload"
-IPA_PATH="$IPA_DIR/$IPA_NAME"
-IPA_SIZE=$(stat -f%z "$IPA_PATH")
-echo "    ipa: $IPA_PATH ($IPA_SIZE bytes)"
-
-# 7. Generate release notes before the version-bump commit so
+# 6. Generate release notes before the version-bump commit so
 # `--unreleased --tag` covers everything since the previous tag
 # under the version we're about to ship. After prepending the entry to
 # CHANGELOG.md, re-read that section back out so every downstream
@@ -173,39 +136,56 @@ fi
 
 RELEASE_NOTES=$(printf "## What's changed\n\n%s\n\n---\n> Unsigned build - resign with [SideStore](https://sidestore.io), AltStore, or Sideloadly before installing." "$CHANGELOG")
 
-# 8. Update altstore-source.json with the freshly-built IPA's
-# size + download URL. AltStore validates that the size in the
-# manifest exactly matches the downloaded asset on install; a
-# stale entry breaks updates for every AltStore-source-subscribed
-# user.
-echo "==> updating altstore-source.json"
-RELEASE_DATE=$(date -u +"%Y-%m-%d")
-DOWNLOAD_URL="https://github.com/mateo-m/empo-app/releases/download/v$VERSION/$IPA_NAME"
-bun "$REPO_ROOT/scripts/update-altstore-source.ts" \
-    --version "$VERSION" \
-    --build "$BUILD" \
-    --size "$IPA_SIZE" \
-    --date "$RELEASE_DATE" \
-    --download-url "$DOWNLOAD_URL" \
-    --description "$CHANGELOG"
-
-# 9. Commit + tag (signed). Single commit covers the version
-# bump, changelog, and altstore-source.json update so the tag
-# points at a tree consistent with the published IPA. The
-# generated .xcodeproj stays untracked; project.yml is the source
-# of truth and the repo intentionally ignores XcodeGen output.
+# 7. Commit + tag (signed). Tag the release metadata first so the IPA
+# build below runs from a clean tree and bakes the release commit hash
+# into GitInfo instead of the pre-release parent plus a dirty marker.
+# AltStore metadata is synced after publish by
+# .github/workflows/update-altstore-source.yml using the release body,
+# asset URL, and uploaded IPA size as the source of truth.
 git -C "$REPO_ROOT" add "$PROJECT_YML" \
-    "$CHANGELOG_PATH" \
-    "$ALTSTORE_SOURCE"
+    "$CHANGELOG_PATH"
 git -C "$REPO_ROOT" commit -S -m "chore: bump version to $VERSION (build $BUILD)"
 git -C "$REPO_ROOT" tag -s "v$VERSION" -m "v$VERSION"
 
-# 10. Push
+# 8. Build unsigned .ipa from the clean release commit.
+echo "==> building unsigned ipa"
+BUILD_DIR="$PROJECT_DIR/build/Release-iphoneos"
+xcodebuild \
+    -project "$PROJECT_DIR/Empo.xcodeproj" \
+    -target Empo \
+    -sdk iphoneos \
+    -arch arm64 \
+    -configuration Release \
+    CODE_SIGNING_ALLOWED=NO \
+    CONFIGURATION_BUILD_DIR="$BUILD_DIR" \
+    build 2>&1 | grep -E "^(Build|error:|warning: |CompileSwift|Ld )" || true
+
+APP_PATH="$BUILD_DIR/Empo.app"
+if [[ ! -d "$APP_PATH" ]]; then
+    echo "error: build failed - Empo.app not found at $BUILD_DIR"
+    exit 1
+fi
+
+echo "==> ad-hoc signing with entitlements"
+codesign --force --sign - \
+    --generate-entitlement-der \
+    --entitlements "$PROJECT_DIR/Empo.entitlements" \
+    "$APP_PATH"
+
+mkdir -p "$IPA_DIR/Payload"
+cp -R "$APP_PATH" "$IPA_DIR/Payload/Empo.app"
+IPA_NAME="Empo-${VERSION}-unsigned.ipa"
+(cd "$IPA_DIR" && zip -qr "$IPA_NAME" Payload)
+rm -rf "$IPA_DIR/Payload"
+IPA_PATH="$IPA_DIR/$IPA_NAME"
+echo "    ipa: $IPA_PATH ($(stat -f%z "$IPA_PATH") bytes)"
+
+# 9. Push
 echo "==> pushing to origin"
 git -C "$REPO_ROOT" push origin main
 git -C "$REPO_ROOT" push origin "v$VERSION"
 
-# 11. Create GitHub release
+# 10. Create GitHub release
 echo "==> creating github release"
 gh release create "v$VERSION" \
     --title "v$VERSION" \
