@@ -144,17 +144,11 @@ echo "    ipa: $IPA_PATH ($IPA_SIZE bytes)"
 
 # 7. Generate release notes before the version-bump commit so
 # `--unreleased --tag` covers everything since the previous tag
-# under the version we're about to ship. The body template includes a
-# release heading; strip that for places that only want the grouped
-# bullet list.
+# under the version we're about to ship. After prepending the entry to
+# CHANGELOG.md, re-read that section back out so every downstream
+# consumer (AltStore + GitHub release) uses the exact committed text.
 echo "==> generating release notes"
 FULL_CHANGELOG_ENTRY=$(git-cliff --config "$REPO_ROOT/cliff.toml" --unreleased --tag "v$VERSION")
-CHANGELOG=$(printf '%s\n' "$FULL_CHANGELOG_ENTRY" | awk 'BEGIN { emit = 0 } /^### / { emit = 1 } emit { print }')
-
-if [[ -z "${CHANGELOG//[$' \t\r\n']/}" ]]; then
-    echo "error: git-cliff generated empty release notes"
-    exit 1
-fi
 
 if [[ -f "$CHANGELOG_PATH" ]]; then
     git-cliff --config "$REPO_ROOT/cliff.toml" --unreleased --tag "v$VERSION" --prepend "$CHANGELOG_PATH"
@@ -163,6 +157,21 @@ else
 fi
 
 perl -0pi -e 's/\n{3,}/\n\n/g' "$CHANGELOG_PATH"
+
+CHANGELOG=$(VERSION="$VERSION" perl -0ne '
+    $version = quotemeta($ENV{VERSION});
+    if (/^## $version - .*?\n\n(.*?)(?=^## \d+\.\d+\.\d+ - |\z)/ms) {
+        print $1;
+        exit;
+    }
+' "$CHANGELOG_PATH")
+
+if [[ -z "${CHANGELOG//[$' \t\r\n']/}" ]]; then
+    echo "error: failed to extract v$VERSION release notes from CHANGELOG.md"
+    exit 1
+fi
+
+RELEASE_NOTES=$(printf "## What's changed\n\n%s\n\n---\n> Unsigned build - resign with [SideStore](https://sidestore.io), AltStore, or Sideloadly before installing." "$CHANGELOG")
 
 # 8. Update altstore-source.json with the freshly-built IPA's
 # size + download URL. AltStore validates that the size in the
@@ -200,12 +209,7 @@ git -C "$REPO_ROOT" push origin "v$VERSION"
 echo "==> creating github release"
 gh release create "v$VERSION" \
     --title "v$VERSION" \
-    --notes "## What's changed
-
-$CHANGELOG
-
----
-> Unsigned build - resign with [SideStore](https://sidestore.io), AltStore, or Sideloadly before installing." \
+    --notes "$RELEASE_NOTES" \
     "$IPA_PATH"
 
 echo "==> done - v$VERSION released"
