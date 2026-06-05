@@ -141,7 +141,25 @@ void mkxp_requestTerminate(void) {
 
 ---
 
-## 7. AppWindow layering above SDL
+## 7. Ruby timing compatibility (`Graphics.delta`)
+
+**Problem (`graphics.cpp`):** Some Pokemon fangames built against mkxp-era compatibility shims treat Ruby's `Graphics.delta` as **microseconds**, then derive seconds themselves. Pokemon Vanguard does this in `001_MKXP_Compatibility.rb`:
+
+```ruby
+def self.delta_s
+  self.delta.to_f / 1_000_000
+end
+```
+
+Empo's engine-side timing uses seconds internally (`SharedState::runTime()`, frame pacing, transition timers), and an earlier binding exposed that same seconds value directly to Ruby. That made `Graphics.delta_s` collapse to ~0, so Vanguard's battle intro transition timer never advanced and `Graphics.transition` spun forever.
+
+**Solution (`src/display/graphics.cpp`):** Keep the engine's internal timing in seconds, but convert the Ruby-visible `Graphics.delta` value back to mkxp-compatible microseconds at the binding boundary. This preserves the engine's pacing semantics while matching what legacy Pokemon compatibility layers expect.
+
+This fix is intentionally narrow: only the Ruby-facing `Graphics.delta` contract changed. Internal update/blit timing still runs on seconds-based deltas.
+
+---
+
+## 8. AppWindow layering above SDL
 
 **Problem:** SDL creates its own `UIWindow` with an OpenGL view. The SwiftUI Library UI must appear above it, and the Player controls must overlay it while passing non-control touches through.
 
@@ -157,6 +175,7 @@ The architecture can be summarized as:
 | -------------------------- | ----------------------------------------------- |
 | SDL can't restart          | Persistent window/EGL/AL, session loop          |
 | Ruby can't restart         | Keep VM alive, reset state between sessions     |
+| Some games expect `Graphics.delta` in microseconds | Keep engine timing in seconds, expose Ruby delta in microseconds |
 | Main thread blocked by SDL | Pump CFRunLoop manually                         |
 | No C++→Swift callbacks     | C function pointer callbacks (dispatch to main) |
 | No direct engine kill      | Inject SDL_QUIT event                           |
