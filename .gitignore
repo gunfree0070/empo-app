@@ -46,6 +46,7 @@ ios/Empo/src/App/GitInfo.generated.swift
 *.md
 !/docs/**/*.md
 !/ios/**/*.md
+!/CHANGELOG.md
 !/README.md
 
 # Python cache (agent skill scripts)

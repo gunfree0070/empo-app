@@ -6,6 +6,7 @@ PROJECT_DIR="$REPO_ROOT/ios/Empo"
 PROJECT_YML="$PROJECT_DIR/project.yml"
 IPA_DIR="$REPO_ROOT/build/ipa"
 ALTSTORE_SOURCE="$REPO_ROOT/altstore-source.json"
+CHANGELOG_PATH="$REPO_ROOT/CHANGELOG.md"
 
 usage() {
     echo "usage: $0 <bump>"
@@ -50,6 +51,11 @@ case "$BUMP_OR_VERSION" in
 esac
 
 echo "==> releasing v$VERSION"
+
+if ! command -v git-cliff >/dev/null 2>&1; then
+    echo "error: git-cliff is required to generate release notes"
+    exit 1
+fi
 
 # Refuse to bump onto an existing tag. Re-cutting an already-shipped
 # version overwrites the tag + GitHub release in place, which is
@@ -136,17 +142,27 @@ IPA_PATH="$IPA_DIR/$IPA_NAME"
 IPA_SIZE=$(stat -f%z "$IPA_PATH")
 echo "    ipa: $IPA_PATH ($IPA_SIZE bytes)"
 
-# 7. Generate changelog (uses git-cliff if installed, otherwise a
-# generic placeholder). Generated before the version-bump commit
-# so `--unreleased` covers everything since the previous tag.
-CHANGELOG=""
-if command -v git-cliff &>/dev/null; then
-    CHANGELOG=$(git-cliff --config "$REPO_ROOT/cliff.toml" --unreleased --strip all 2>/dev/null || true)
+# 7. Generate release notes before the version-bump commit so
+# `--unreleased --tag` covers everything since the previous tag
+# under the version we're about to ship. The body template includes a
+# release heading; strip that for places that only want the grouped
+# bullet list.
+echo "==> generating release notes"
+FULL_CHANGELOG_ENTRY=$(git-cliff --config "$REPO_ROOT/cliff.toml" --unreleased --tag "v$VERSION")
+CHANGELOG=$(printf '%s\n' "$FULL_CHANGELOG_ENTRY" | awk 'BEGIN { emit = 0 } /^### / { emit = 1 } emit { print }')
+
+if [[ -z "${CHANGELOG//[$' \t\r\n']/}" ]]; then
+    echo "error: git-cliff generated empty release notes"
+    exit 1
 fi
 
-if [[ -z "$CHANGELOG" ]]; then
-    CHANGELOG="See commit history for changes."
+if [[ -f "$CHANGELOG_PATH" ]]; then
+    git-cliff --config "$REPO_ROOT/cliff.toml" --unreleased --tag "v$VERSION" --prepend "$CHANGELOG_PATH"
+else
+    printf '%s\n' "$FULL_CHANGELOG_ENTRY" > "$CHANGELOG_PATH"
 fi
+
+perl -0pi -e 's/\n{3,}/\n\n/g' "$CHANGELOG_PATH"
 
 # 8. Update altstore-source.json with the freshly-built IPA's
 # size + download URL. AltStore validates that the size in the
@@ -165,9 +181,11 @@ bun "$REPO_ROOT/scripts/update-altstore-source.ts" \
     --description "$CHANGELOG"
 
 # 9. Commit + tag (signed). Single commit covers the version
-# bump, regenerated xcodeproj, and altstore-source.json update so
-# the tag points at a tree consistent with the published IPA.
+# bump, regenerated xcodeproj, changelog, and altstore-source.json
+# update so the tag points at a tree consistent with the published
+# IPA.
 git -C "$REPO_ROOT" add "$PROJECT_YML" \
+    "$CHANGELOG_PATH" \
     "ios/Empo/Empo.xcodeproj/project.pbxproj" \
     "$ALTSTORE_SOURCE"
 git -C "$REPO_ROOT" commit -S -m "chore: bump version to $VERSION (build $BUILD)"

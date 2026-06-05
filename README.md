@@ -40,6 +40,7 @@ In-game battle:
 - [Notable hacks](#notable-hacks)
 - [Requirements](#requirements)
 - [Build](#build)
+- [Releases](#releases)
 - [Importing games](#importing-games)
 - [Contributing](#contributing)
 - [License](#license)
@@ -146,6 +147,51 @@ xcrun simctl launch "$SIM" sh.mateo.empo
 ```
 
 For device builds, swap `iphonesimulator` for `iphoneos` and create a gitignored `ios/Empo/Signing.xcconfig` with your `DEVELOPMENT_TEAM`.
+
+## Releases
+
+Release notes come from `git-cliff`, so the list of changes is only as good as the commit subjects going into it. The tracked `CHANGELOG.md` only contains tagged releases; unreleased work stays in commit history until you cut the next one.
+
+Tools used by the release script:
+
+- `git-cliff`
+- `xcodegen`
+- `bun`
+- `gh`
+
+Install the missing ones with Homebrew if needed:
+
+```sh
+brew install git-cliff xcodegen bun gh
+```
+
+Cut a release from a clean `main` branch:
+
+```sh
+./scripts/release.sh patch
+./scripts/release.sh minor
+./scripts/release.sh 0.2.0
+```
+
+The script will:
+
+- bump the app version in `ios/Empo/project.yml`
+- regenerate the Xcode project
+- build the unsigned `.ipa`
+- generate release notes from commits since the last tag
+- prepend the new entry to `CHANGELOG.md`
+- update `altstore-source.json`
+- commit, tag, push, and create the GitHub release
+
+For commit subjects, stick to the usual conventional style already used in this repo:
+
+- `feat(import): support foo`
+- `fix(player): avoid bar`
+- `docs(readme): clarify baz`
+- `chore(deps): bump qux`
+- `ci(release): sync altstore source`
+
+If the subject does not start with something like `feat:`, `fix:`, `docs:`, `chore:`, `ci:`, `refactor:`, `perf:`, or `style:`, `git-cliff` will usually skip it.
 
 ## Importing games
 

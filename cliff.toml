@@ -1,13 +1,17 @@
 [changelog]
-header = ""
-body = """
+header = "# Changelog\n\n"
+body = """{% if version %}
+## {{ version | trim_start_matches(pat="v") }} - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}
+## Unreleased
+{% endif %}
+
 {% for group, commits in commits | group_by(attribute="group") %}
 ### {{ group }}
-{% for commit in commits %}\
-- {{ commit.message | upper_first }} ([`{{ commit.id | truncate(length=7, end="") }}`](https://github.com/mateo-m/empo-app/commit/{{ commit.id }}))
+
+{% for commit in commits %}- {{ commit.message | upper_first }} ([`{{ commit.id | truncate(length=7, end="") }}`](https://github.com/mateo-m/empo-app/commit/{{ commit.id }}))
 {% endfor %}
-{% endfor %}
-"""
+{% endfor %}"""
 trim = true
 footer = ""
 
@@ -15,12 +19,15 @@ footer = ""
 conventional_commits = true
 filter_unconventional = true
 commit_parsers = [
+  { message = "^feat\\(release\\):", group = "Release" },
   { message = "^feat", group = "Features" },
+  { message = "^fix\\(release\\):", group = "Release" },
   { message = "^fix", group = "Bug Fixes" },
-  { message = "^ui|^style", group = "UI" },
-  { message = "^refactor", group = "Refactor" },
   { message = "^perf", group = "Performance" },
+  { message = "^refactor", group = "Refactor" },
+  { message = "^ui|^style", group = "UI" },
   { message = "^docs", group = "Documentation" },
+  { message = "^ci", group = "CI" },
   { message = "^chore", group = "Chores" },
   { message = ".*", group = "Other" },
 ]
