@@ -68,6 +68,8 @@ AltStore / SideStore users can add Empo as a source for native update notificati
 https://raw.githubusercontent.com/mateo-m/empo-app/main/altstore-source.json
 ```
 
+`altstore-source.json` is kept in sync with GitHub releases automatically. If a release is edited, unpublished, or deleted, the manifest updates to match; if branch protection blocks the automation from pushing straight to `main`, it opens a PR instead. There's also a manual `Sync AltStore Source` Actions workflow if a release ever needs to be re-synced by tag.
+
 ### Limitations
 
 - **Single game per session.** After exiting a game, force-close + reopen Empo from the app switcher to start a different one. Cross-session play is parked pending reliable Ruby state cleanup; see [`docs/multi-session.md`](docs/multi-session.md).

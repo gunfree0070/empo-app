@@ -93,4 +93,7 @@ jobs:
 
       - name: prettier check
         run: |
-          bun x prettier --check 'ios/Empo/project.yml' 'ios/Empo/curated-patches/gameRegistry.json'
+          bun x prettier --check \
+            'altstore-source.json' \
+            'ios/Empo/project.yml' \
+            'ios/Empo/curated-patches/gameRegistry.json'

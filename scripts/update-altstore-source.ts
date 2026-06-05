@@ -1,13 +1,12 @@
 #!/usr/bin/env bun
 //
-// Bumps the AltStore source manifest for a new release.
+// Updates the AltStore source manifest for a release.
 //
-// Reads `altstore-source.json` at the repo root, prepends (or replaces) a
-// version entry under `apps[0].versions[]`, and writes the file back.
-// Called from `scripts/release.sh` after the unsigned IPA is packaged so
-// the recorded `size` field exactly matches the asset uploaded to GitHub
-// (AltStore validates this on download and refuses to install on
-// mismatch).
+// Reads `altstore-source.json` at the repo root, then either prepends (or
+// replaces) a version entry under `apps[0].versions[]` or removes one.
+// Called from `scripts/release.sh` after the unsigned IPA is packaged so the
+// recorded `size` field exactly matches the asset uploaded to GitHub
+// (AltStore validates this on download and refuses to install on mismatch).
 //
 // AltStore's source schema requires versions to be ordered newest-first
 // (per <https://faq.altstore.io/developers/make-a-source.md>); we honor
@@ -21,6 +20,10 @@
 //     --date 2026-05-07 \
 //     --download-url https://github.com/.../Empo-0.1.1-unsigned.ipa \
 //     [--description "What changed in this release."]
+//
+//   bun scripts/update-altstore-source.ts \
+//     --version 0.1.1 \
+//     --remove
 //
 // Re-running with a `--version` that's already present in the manifest
 // replaces the existing entry (covers re-cuts of the same tag, where
@@ -59,9 +62,10 @@ const { values } = parseArgs({
     date: { type: "string" },
     "download-url": { type: "string" },
     description: { type: "string" },
-    source: { type: "string", default: defaultSourcePath },
+    remove: { type: "boolean", default: false },
+    source: { type: "string", default: defaultSourcePath }
   },
-  strict: true,
+  strict: true
 });
 
 // Pull every required flag through `requireFlag` so the rest of the
@@ -77,15 +81,16 @@ function requireFlag(name: string, value: string | undefined): string {
 }
 
 const version = requireFlag("version", values.version);
-const build = requireFlag("build", values.build);
-const dateString = requireFlag("date", values.date);
-const downloadUrl = requireFlag("download-url", values["download-url"]);
-const sizeString = requireFlag("size", values.size);
-const description = values.description;
+const remove = values.remove ?? false;
+const build = remove ? undefined : requireFlag("build", values.build);
+const dateString = remove ? undefined : requireFlag("date", values.date);
+const downloadUrl = remove ? undefined : requireFlag("download-url", values["download-url"]);
+const sizeString = remove ? undefined : requireFlag("size", values.size);
+const description = remove ? undefined : values.description;
 const sourcePath = values.source ?? defaultSourcePath;
 
-const sizeBytes = Number(sizeString);
-if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
+const sizeBytes = remove ? undefined : Number(sizeString);
+if (!remove && (!Number.isFinite(sizeBytes) || sizeBytes <= 0)) {
   console.error(`error: --size must be a positive integer (got ${sizeString})`);
   process.exit(1);
 }
@@ -97,6 +102,20 @@ if (!manifest.apps?.[0]?.versions) {
   process.exit(1);
 }
 const versions = manifest.apps[0].versions;
+
+if (remove) {
+  const originalLength = versions.length;
+  manifest.apps[0].versions = versions.filter((v) => v.version !== version);
+
+  if (manifest.apps[0].versions.length === originalLength) {
+    console.log(`[altstore-source] no entry for v${version} in ${sourcePath}`);
+    process.exit(0);
+  }
+
+  await Bun.write(sourcePath, JSON.stringify(manifest, null, 2) + "\n");
+  console.log(`[altstore-source] removed v${version} -> ${sourcePath}`);
+  process.exit(0);
+}
 
 // Reuse the previous entry's minOSVersion so the floor stays aligned
 // with the project's actual deployment target without forcing the
@@ -113,7 +132,7 @@ const entry: VersionEntry = {
   ...(description ? { localizedDescription: description } : {}),
   downloadURL: downloadUrl,
   size: sizeBytes,
-  ...(minOSVersion ? { minOSVersion } : {}),
+  ...(minOSVersion ? { minOSVersion } : {})
 };
 
 const existingIndex = versions.findIndex((v) => v.version === version);
