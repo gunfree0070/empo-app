@@ -139,9 +139,9 @@ RELEASE_NOTES=$(printf "## What's changed\n\n%s\n\n---\n> Unsigned build - resig
 # 7. Commit + tag (signed). Tag the release metadata first so the IPA
 # build below runs from a clean tree and bakes the release commit hash
 # into GitInfo instead of the pre-release parent plus a dirty marker.
-# AltStore metadata is synced after publish by
-# .github/workflows/update-altstore-source.yml using the release body,
-# asset URL, and uploaded IPA size as the source of truth.
+# AltStore metadata is synced locally after the IPA is built, then
+# committed as a follow-up on main so the published manifest cannot be
+# skipped if the release succeeds.
 git -C "$REPO_ROOT" add "$PROJECT_YML" \
     "$CHANGELOG_PATH"
 git -C "$REPO_ROOT" commit -S -m "chore: bump version to $VERSION (build $BUILD)"
@@ -178,14 +178,50 @@ IPA_NAME="Empo-${VERSION}-unsigned.ipa"
 (cd "$IPA_DIR" && zip -qr "$IPA_NAME" Payload)
 rm -rf "$IPA_DIR/Payload"
 IPA_PATH="$IPA_DIR/$IPA_NAME"
-echo "    ipa: $IPA_PATH ($(stat -f%z "$IPA_PATH") bytes)"
+IPA_SIZE=$(stat -f%z "$IPA_PATH")
+echo "    ipa: $IPA_PATH ($IPA_SIZE bytes)"
 
-# 9. Push
+# 9. Update AltStore source from the locally-built artifact so the
+# manifest lands through the same signed release flow as every other
+# release metadata change.
+echo "==> updating altstore source"
+ORIGIN_URL=$(git -C "$REPO_ROOT" remote get-url origin)
+case "$ORIGIN_URL" in
+    git@github.com:*)
+        REPO_SLUG="${ORIGIN_URL#git@github.com:}"
+        ;;
+    https://github.com/*)
+        REPO_SLUG="${ORIGIN_URL#https://github.com/}"
+        ;;
+    *)
+        echo "error: unsupported origin URL for GitHub release assets: $ORIGIN_URL"
+        exit 1
+        ;;
+esac
+REPO_SLUG="${REPO_SLUG%.git}"
+IPA_DOWNLOAD_URL="https://github.com/$REPO_SLUG/releases/download/v$VERSION/$IPA_NAME"
+RELEASE_DATE=$(date -u +%Y-%m-%d)
+
+bun "$REPO_ROOT/scripts/update-altstore-source.ts" \
+    --version "$VERSION" \
+    --build "$BUILD" \
+    --size "$IPA_SIZE" \
+    --date "$RELEASE_DATE" \
+    --download-url "$IPA_DOWNLOAD_URL" \
+    --description "$CHANGELOG"
+
+git -C "$REPO_ROOT" add "$ALTSTORE_SOURCE"
+if ! git -C "$REPO_ROOT" diff --cached --quiet; then
+    # Keep this follow-up commit out of future git-cliff release notes.
+    git -C "$REPO_ROOT" commit -S -m "sync AltStore source for v$VERSION"
+fi
+
+# 10. Push
 echo "==> pushing to origin"
 git -C "$REPO_ROOT" push origin main
 git -C "$REPO_ROOT" push origin "v$VERSION"
 
-# 10. Create GitHub release
+# 11. Create GitHub release
 echo "==> creating github release"
 gh release create "v$VERSION" \
     --title "v$VERSION" \

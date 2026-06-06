@@ -69,7 +69,7 @@ AltStore / SideStore users can add Empo as a source for native update notificati
 https://raw.githubusercontent.com/mateo-m/empo-app/main/altstore-source.json
 ```
 
-`altstore-source.json` is kept in sync with GitHub releases automatically. If a release is edited, unpublished, or deleted, the manifest updates to match; if branch protection blocks the automation from pushing straight to `main`, it opens a PR instead. There's also a manual `Sync AltStore Source` Actions workflow if a release ever needs to be re-synced by tag.
+`altstore-source.json` is updated by `scripts/release.sh` and committed to `main` as part of the local signed release flow. If you ever need to re-sync it after manually editing a GitHub release, run `bun scripts/update-altstore-source.ts ...` locally and commit the manifest update with your normal signing key.
 
 ### Limitations
 
@@ -181,7 +181,7 @@ The script will:
 - build the unsigned `.ipa`
 - generate release notes from commits since the last tag
 - prepend the new entry to `CHANGELOG.md`
-- update `altstore-source.json`
+- update `altstore-source.json` from the locally-built IPA and commit that manifest change
 - commit, tag, push, and create the GitHub release
 
 For commit subjects, stick to the usual conventional style already used in this repo:
