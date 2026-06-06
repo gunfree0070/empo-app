@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.1 - 2026-06-06
+
+### Bug Fixes
+
+- Update mkxp for Flux battle start ([`372f5c3`](https://github.com/mateo-m/empo-app/commit/372f5c309f38412a617f5eb06c4391429b7a07e6))
+- Migrate user data and refresh ruby auto-detect ([`9120666`](https://github.com/mateo-m/empo-app/commit/9120666498d977487b0d115211cc8d640772310b))
+
+### Release
+
+- Stop staging generated xcodeproj ([`3e41829`](https://github.com/mateo-m/empo-app/commit/3e41829355449b926dba57516d11a2d99e8a0993))
+- Source release notes from changelog ([`7acf412`](https://github.com/mateo-m/empo-app/commit/7acf412ab6cf5bb07eb033b3ea43a8f376c7a660))
+- Build ipa from clean release commit ([`16d8443`](https://github.com/mateo-m/empo-app/commit/16d84436f63476efc43c59936ce9d9d4899b75fb))
+
 ## 0.2.0 - 2026-06-05
 
 ### Bug Fixes
