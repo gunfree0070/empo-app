@@ -453,29 +453,6 @@ private struct RefreshSpinIcon: View {
     }
 }
 
-/// Swipe down to dismiss, used by the library's floating update
-/// banner alongside the X button.
-private struct SwipeDownToDismissModifier: ViewModifier {
-    let enabled: Bool
-    let onDismiss: (() -> Void)?
-
-    func body(content: Content) -> some View {
-        if enabled, let onDismiss {
-            content.simultaneousGesture(
-                DragGesture(minimumDistance: 24, coordinateSpace: .local)
-                    .onEnded { value in
-                        let vertical = value.translation.height
-                        let horizontal = abs(value.translation.width)
-                        guard vertical > 48, vertical > horizontal else { return }
-                        onDismiss()
-                    }
-            )
-        } else {
-            content
-        }
-    }
-}
-
 struct UpdateStatusIndicator: View {
     enum Size {
         case compact
@@ -508,7 +485,6 @@ struct UpdateStatusIndicator: View {
             }
             .geometryGroup()
             .animation(Motion.standard, value: chipPhase)
-            .modifier(SwipeDownToDismissModifier(enabled: canDismiss, onDismiss: onDismiss))
         }
     }
 
@@ -561,6 +537,23 @@ struct UpdateStatusIndicator: View {
     }
 }
 
+private struct BrandGlassModifier: ViewModifier {
+    let interactive: Bool
+    let tint: Color
+
+    func body(content: Content) -> some View {
+        if interactive {
+            content
+                .glassEffect(.regular.tint(tint).interactive(), in: .capsule)
+                .darkGlass()
+        } else {
+            content
+                .glassEffect(.regular.tint(tint), in: .capsule)
+                .darkGlass()
+        }
+    }
+}
+
 struct UpdateStatusBadge: View {
     let text: String
     let systemImage: String?
@@ -572,32 +565,69 @@ struct UpdateStatusBadge: View {
     var size: UpdateStatusIndicator.Size = .regular
     fileprivate var animationPhase: UpdateStatusChipPhase?
 
-    var body: some View {
-        Group {
-            if usesBrandGlass {
-                badgeContent
-                    .font(brandFont)
-                    .foregroundStyle(tint)
-                    .shadow(color: .black.opacity(Alpha.shadow), radius: 2, y: 1)
-                    .padding(.horizontal, brandHorizontalPadding)
-                    .padding(.vertical, brandVerticalPadding)
-                    .glassEffect(.regular.tint(background).interactive(), in: .capsule)
-                    .darkGlass()
-            } else {
-                badgeContent
-                    .font(secondaryFont)
-                    .foregroundStyle(tint)
-                    .padding(.horizontal, secondaryHorizontalPadding)
-                    .padding(.vertical, secondaryVerticalPadding)
-                    .background(background)
-                    .clipShape(Capsule())
-            }
-        }
-        .fixedSize(horizontal: true, vertical: false)
-        .animation(Motion.standard, value: animationPhase ?? .hidden)
+    @Environment(\.openURL) private var openURL
+    @State private var dismissDragOffset: CGFloat = 0
+    @State private var suppressTapOpen = false
+
+    private static let dismissSwipeThreshold: CGFloat = 24
+
+    /// Library banner: tap opens the release page, swipe down or X
+    /// dismisses. Settings header keeps a plain `Link` instead.
+    private var usesDismissiblePromoInteraction: Bool {
+        actionURL != nil && dismissAction != nil
     }
 
+    var body: some View {
+        dismissibleInteraction(styledBadge)
+            .offset(y: usesDismissiblePromoInteraction ? dismissDragOffset : 0)
+            .fixedSize(horizontal: true, vertical: false)
+            .animation(Motion.standard, value: animationPhase ?? .hidden)
+    }
+
+    @ViewBuilder
+    private var styledBadge: some View {
+        if usesBrandGlass {
+            badgeContent
+                .font(brandFont)
+                .foregroundStyle(tint)
+                .shadow(color: .black.opacity(Alpha.shadow), radius: 2, y: 1)
+                .padding(.horizontal, brandHorizontalPadding)
+                .padding(.vertical, brandVerticalPadding)
+                .modifier(BrandGlassModifier(interactive: !usesDismissiblePromoInteraction, tint: background))
+        } else {
+            badgeContent
+                .font(secondaryFont)
+                .foregroundStyle(tint)
+                .padding(.horizontal, secondaryHorizontalPadding)
+                .padding(.vertical, secondaryVerticalPadding)
+                .background(background)
+                .clipShape(Capsule())
+        }
+    }
+
+    @ViewBuilder
+    private func dismissibleInteraction<Content: View>(_ content: Content) -> some View {
+        if usesDismissiblePromoInteraction, let actionURL, let dismissAction {
+            content
+                .contentShape(.capsule)
+                .gesture(promoDragGesture(url: actionURL, dismiss: dismissAction))
+                .accessibilityAddTraits(.isButton)
+                .accessibilityHint("Swipe down to dismiss")
+        } else {
+            content
+        }
+    }
+
+    @ViewBuilder
     private var badgeContent: some View {
+        if usesDismissiblePromoInteraction, let actionURL, let dismissAction {
+            dismissiblePromoContent(url: actionURL, dismiss: dismissAction)
+        } else {
+            staticBadgeContent
+        }
+    }
+
+    private var staticBadgeContent: some View {
         HStack(spacing: 0) {
             if let actionURL {
                 Link(destination: actionURL) {
@@ -609,18 +639,73 @@ struct UpdateStatusBadge: View {
             }
 
             if let dismissAction {
-                Button(action: dismissAction) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(dismissFont)
-                        .foregroundStyle(tint)
-                        .frame(width: dismissFrame, height: dismissFrame)
-                        .contentShape(Rectangle())
-                }
-                .padding(.leading, dismissLeadingPadding)
-                .buttonStyle(.plain)
-                .accessibilityLabel("Dismiss update banner")
+                dismissButton(action: dismissAction)
             }
         }
+    }
+
+    private func dismissiblePromoContent(url: URL, dismiss: @escaping () -> Void) -> some View {
+        HStack(spacing: 0) {
+            label
+                .frame(maxWidth: .infinity, alignment: .leading)
+            dismissButton { dismissPromo(dismiss) }
+        }
+    }
+
+    private func promoDragGesture(url: URL, dismiss: @escaping () -> Void) -> some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                let vertical = value.translation.height
+                let horizontal = abs(value.translation.width)
+                if vertical > 0, vertical > horizontal {
+                    dismissDragOffset = vertical
+                }
+            }
+            .onEnded { value in
+                let vertical = value.translation.height
+                let horizontal = abs(value.translation.width)
+                let isTap = vertical * vertical + horizontal * horizontal < 144
+
+                if vertical > 0, vertical > horizontal {
+                    let distanceDismiss = vertical > Self.dismissSwipeThreshold
+                    let flickDismiss = vertical > 8 && value.velocity.height > 400
+                    if distanceDismiss || flickDismiss {
+                        dismissPromo(dismiss, fromSwipe: true)
+                        return
+                    }
+                }
+
+                withAnimation(Motion.gentle) { dismissDragOffset = 0 }
+                guard isTap else { return }
+                guard !suppressTapOpen else {
+                    suppressTapOpen = false
+                    return
+                }
+                openURL(url)
+            }
+    }
+
+    private func dismissPromo(_ dismiss: @escaping () -> Void, fromSwipe: Bool = false) {
+        if !fromSwipe {
+            dismissDragOffset = 0
+        }
+        dismiss()
+    }
+
+    private func dismissButton(action: @escaping () -> Void) -> some View {
+        Button {
+            suppressTapOpen = true
+            action()
+        } label: {
+            Image(systemName: "xmark.circle.fill")
+                .font(dismissFont)
+                .foregroundStyle(tint)
+                .frame(width: dismissFrame, height: dismissFrame)
+                .contentShape(Rectangle())
+        }
+        .padding(.leading, dismissLeadingPadding)
+        .buttonStyle(.plain)
+        .accessibilityLabel("Dismiss update banner")
     }
 
     private var label: some View {

@@ -28,7 +28,7 @@ struct RootView: View {
     var body: some View {
         ZStack {
             // Always mounted so NavigationStack persists across phases
-            GameLibraryView(appState: appState, heroNamespace: hero, splashDismissed: splashDismissed)
+            GameLibraryView(heroNamespace: hero, splashDismissed: splashDismissed)
                 .opacity(appState.phase == .playing ? 0 : 1)
                 .allowsHitTesting(appState.phase != .playing)
 

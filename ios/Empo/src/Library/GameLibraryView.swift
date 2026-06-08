@@ -8,9 +8,9 @@ private struct EmptyStateHeightKey: PreferenceKey {
 }
 
 struct GameLibraryView: View {
-    var appState: AppState
     var heroNamespace: Namespace.ID
     var splashDismissed: Bool = true
+    @Environment(\.appState) private var appState
     @Environment(\.gameLibrary) private var library
     @Environment(\.appSettings) private var settings
     @Environment(\.pauseManager) private var pauseManager
@@ -40,7 +40,6 @@ struct GameLibraryView: View {
     @State private var gameSizes: [String: Int64] = [:]
     @State private var sizesTask: Task<Void, Never>?
     @State private var importWorkflow = ImportWorkflowController()
-    @AppStorage("GameLibraryView.updateBannerDismissed") private var updateBannerDismissed = false
     /// Per-game record of which visual source triggered the most recent
     /// navigation into the player. Drives `.navigationTransition(.zoom)`
     /// so the exit animation lands on the same spot the user tapped.
@@ -271,7 +270,7 @@ struct GameLibraryView: View {
     }
 
     private var showsUpdateBanner: Bool {
-        guard !selectionMode, !updateBannerDismissed else { return false }
+        guard !selectionMode, !appState.updateBannerDismissed else { return false }
         guard case .available = appState.updateStatus else { return false }
         return true
     }
@@ -282,7 +281,7 @@ struct GameLibraryView: View {
             libraryUpdateBanner
                 .padding(.horizontal, Spacing.xl)
                 .padding(.bottom, Spacing._2xl)
-                .transition(.move(edge: .bottom).combined(with: .cardAppear))
+                .transition(.move(edge: .bottom).combined(with: .fadeBlur))
         }
     }
 
@@ -332,7 +331,7 @@ struct GameLibraryView: View {
             canDismiss: true,
             onDismiss: {
                 withAnimation(Motion.gentle) {
-                    updateBannerDismissed = true
+                    appState.updateBannerDismissed = true
                 }
             }
         )

@@ -110,6 +110,17 @@ struct ScaleFadeBlurTransition: ViewModifier {
     }
 }
 
+struct FadeBlurTransition: ViewModifier {
+    let active: Bool
+    let blurRadius: CGFloat
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(active ? 0 : 1)
+            .blur(radius: active ? blurRadius : 0)
+    }
+}
+
 struct ControlTransition: ViewModifier {
     let active: Bool
     let anchor: UnitPoint
@@ -134,6 +145,13 @@ extension AnyTransition {
         .modifier(
             active: ScaleFadeBlurTransition(active: true, blurRadius: 6),
             identity: ScaleFadeBlurTransition(active: false, blurRadius: 6)
+        )
+    }
+
+    static var fadeBlur: AnyTransition {
+        .modifier(
+            active: FadeBlurTransition(active: true, blurRadius: 6),
+            identity: FadeBlurTransition(active: false, blurRadius: 6)
         )
     }
 

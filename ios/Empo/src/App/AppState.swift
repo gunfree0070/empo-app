@@ -23,6 +23,8 @@ class AppState {
     /// Latest release check result for sideload/dev builds. Filled at
     /// launch from `RootView`; Settings and the library banner read it.
     var updateStatus: UpdateChecker.Status = .unknown
+    /// Library update banner dismissed for this launch only.
+    var updateBannerDismissed = false
     private var terminationExpected = false
 
     private let crashTracker = CrashTracker()
