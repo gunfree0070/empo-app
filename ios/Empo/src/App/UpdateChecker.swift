@@ -65,10 +65,15 @@ enum UpdateChecker {
     private static let repo = "empo-app"
 
     /// How long to trust a successful "up to date" or "available"
-    /// result before rechecking. Six hours keeps repeat launches
+    /// result before rechecking. One hour keeps repeat launches
     /// quiet without holding stale info long enough to mislead a
     /// user who just released a new build.
-    private static let recheckInterval: TimeInterval = 6 * 60 * 60
+    private static let recheckInterval: TimeInterval = 60 * 60
+
+    /// Minimum time the UI should stay in `.checking` before a
+    /// result is shown. Cached or fast network hits otherwise
+    /// flash the spinner for a single frame, which feels broken.
+    private static let minimumCheckingDuration: Duration = .milliseconds(500)
 
     /// UserDefaults keys for the persisted check result. Kept as
     /// raw strings (no enum) so older builds can still decode the
@@ -79,26 +84,34 @@ enum UpdateChecker {
     }
 
     /// Returns the freshest status without rechecking when a
-    /// previous check is still inside `recheckInterval`. Callers
-    /// that want a guaranteed-fresh result should call
-    /// `checkNow()` directly.
+    /// previous check is still inside `recheckInterval`. Called once
+    /// at launch from `RootView`. Use `checkNow()` for a forced
+    /// refresh.
     static func checkIfStale() async -> Status {
-        // Hide entirely on App Store / TestFlight.
-        guard isSideloadOrDevBuild else {
-            return .upToDate(currentVersion: AppInfo.version)
+        await withMinimumCheckingDuration {
+            // Hide entirely on App Store / TestFlight.
+            guard isSideloadOrDevBuild else {
+                return .upToDate(currentVersion: AppInfo.version)
+            }
+            if let cached = cachedStatus() {
+                return cached
+            }
+            return await fetchLatestRelease()
         }
-        if let cached = cachedStatus() {
-            return cached
-        }
-        return await checkNow()
     }
 
-    /// Forces a network fetch; used by the manual "Check for
-    /// updates" button in Settings.
+    /// Forces a network fetch; used by the manual refresh control in
+    /// Settings and by retry affordances in the update UI.
     static func checkNow() async -> Status {
-        guard isSideloadOrDevBuild else {
-            return .upToDate(currentVersion: AppInfo.version)
+        await withMinimumCheckingDuration {
+            guard isSideloadOrDevBuild else {
+                return .upToDate(currentVersion: AppInfo.version)
+            }
+            return await fetchLatestRelease()
         }
+    }
+
+    private static func fetchLatestRelease() async -> Status {
         guard
             let url = URL(
                 string: "https://api.github.com/repos/\(owner)/\(repo)/releases/latest"
@@ -145,6 +158,19 @@ enum UpdateChecker {
     }
 
     // MARK: - Internals
+
+    private static func withMinimumCheckingDuration(
+        _ operation: () async -> Status
+    ) async -> Status {
+        let started = ContinuousClock.now
+        let status = await operation()
+        let elapsed = started.duration(to: .now)
+        let remaining = minimumCheckingDuration - elapsed
+        if remaining > .zero {
+            try? await Task.sleep(for: remaining)
+        }
+        return status
+    }
 
     /// Returns the cached result if the last successful check is
     /// still inside `recheckInterval`. The cached version is

@@ -56,6 +56,9 @@ struct RootView: View {
             }
         }
         .task {
+            await appState.checkForUpdatesIfStale()
+        }
+        .task {
             if appState.pendingCrashRecovery {
                 appState.consumeCrashRecovery()
                 return

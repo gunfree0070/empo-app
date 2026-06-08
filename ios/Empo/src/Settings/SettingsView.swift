@@ -1,15 +1,10 @@
 import SwiftUI
 
 struct SettingsView: View {
+    @Environment(\.appState) private var appState
     @Environment(\.appSettings) private var settings
     @Environment(\.dismiss) private var dismiss
     @State private var showBuildInfo = false
-    /// Latest known release status. Driven by `UpdateChecker` on
-    /// view appear (uses its 6-hour cache so opening Settings
-    /// repeatedly doesn't hammer the GitHub API). Hidden entirely
-    /// on App Store / TestFlight installs since the platform
-    /// handles updates there.
-    @State private var updateStatus: UpdateChecker.Status = .unknown
 
     // ExperimentalFeature toggles + ConfirmSheet/InfoSheet were
     // deleted alongside the gamePause/cheats graduation - see the
@@ -219,11 +214,6 @@ struct SettingsView: View {
             .sheet(isPresented: $showBuildInfo) {
                 BuildInfoSheet()
             }
-            .task {
-                guard UpdateChecker.isSideloadOrDevBuild else { return }
-                updateStatus = .checking
-                updateStatus = await UpdateChecker.checkIfStale()
-            }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -264,12 +254,15 @@ struct SettingsView: View {
             VStack(spacing: Spacing.xs) {
                 buildVersionButton
                 UpdateStatusIndicator(
-                    status: updateStatus,
+                    status: appState.updateStatus,
                     onTapRetry: {
-                        updateStatus = .checking
-                        updateStatus = await UpdateChecker.checkNow()
+                        await appState.checkForUpdatesNow()
                     },
-                    size: .compact
+                    size: .compact,
+                    showsManualRefresh: UpdateChecker.isSideloadOrDevBuild,
+                    onManualRefresh: {
+                        await appState.checkForUpdatesNow()
+                    }
                 )
             }
         }
@@ -279,6 +272,184 @@ struct SettingsView: View {
         .listRowBackground(Color.clear)
         .listRowSeparator(.hidden)
         .environment(\.headerProminence, .standard)
+    }
+}
+
+private enum UpdateStatusChipPhase: Hashable {
+    case hidden
+    case checking
+    case upToDate
+    case available(version: String)
+    case failed
+
+    init(_ status: UpdateChecker.Status) {
+        switch status {
+        case .unknown:
+            self = .hidden
+        case .checking:
+            self = .checking
+        case .upToDate:
+            self = .upToDate
+        case .available(let version, _):
+            self = .available(version: version)
+        case .failed:
+            self = .failed
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .hidden:
+            return ""
+        case .checking:
+            return "Checking for updates..."
+        case .upToDate:
+            return "Up to date"
+        case .available(let version):
+            return "Update available: v\(version)"
+        case .failed:
+            return "Retry update check"
+        }
+    }
+
+    var systemImage: String? {
+        switch self {
+        case .checking, .hidden:
+            return nil
+        case .upToDate:
+            return "checkmark.circle"
+        case .available:
+            return "arrow.down.circle.fill"
+        case .failed:
+            return "exclamationmark.triangle"
+        }
+    }
+
+    var usesBrandGlass: Bool {
+        if case .available = self { return true }
+        return false
+    }
+}
+
+/// Compact refresh affordance with a spring-driven spin while active.
+/// When the check completes, the icon springs forward until it has
+/// completed at least one full turn from when the spin started, then
+/// resets to 0° invisibly (360° and 0° look identical).
+private struct RefreshSpinIcon: View {
+    let spinning: Bool
+    var size: UpdateStatusIndicator.Size = .regular
+
+    private let spinPeriod: TimeInterval = 0.85
+
+    @State private var spinStart: Date?
+    @State private var spinOrigin: Double = 0
+    @State private var coastRotation: Double?
+    @State private var coastGeneration: UInt = 0
+
+    private var iconFont: Font {
+        switch size {
+        case .compact, .regular: .system(size: 11, weight: .semibold)
+        }
+    }
+
+    private var isCoasting: Bool {
+        coastRotation != nil
+    }
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !spinning && !isCoasting)) { context in
+            Image(systemName: "arrow.clockwise")
+                .font(iconFont)
+                .foregroundStyle(.secondary)
+                .rotationEffect(.degrees(displayedRotation(at: context.date)))
+                .animation(isCoasting ? Motion.standard : nil, value: coastRotation)
+        }
+        .onChange(of: spinning, initial: true) { _, shouldSpin in
+            if shouldSpin {
+                startSpinning()
+            } else {
+                beginCoast()
+            }
+        }
+    }
+
+    private func startSpinning() {
+        coastGeneration += 1
+        coastRotation = nil
+        spinOrigin = 0
+        spinStart = Date()
+    }
+
+    private func displayedRotation(at date: Date) -> Double {
+        if let coastRotation {
+            return coastRotation
+        }
+        return spinRotation(at: date)
+    }
+
+    private func spinRotation(at date: Date) -> Double {
+        guard let spinStart else { return spinOrigin }
+        let elapsed = date.timeIntervalSince(spinStart)
+        let revolution = elapsed / spinPeriod
+        let completed = floor(revolution)
+        let localProgress = revolution - completed
+        let sprungProgress = springRevolutionProgress(localProgress)
+        return spinOrigin + (completed + sprungProgress) * 360
+    }
+
+    /// One 0→1 spring segment per revolution while checking.
+    private func springRevolutionProgress(_ progress: Double) -> Double {
+        let t = min(max(progress, 0), 1)
+        // Critically damped spring approximation (no overshoot).
+        return 1 - (1 + 6 * t) * exp(-6 * t)
+    }
+
+    private func beginCoast() {
+        coastGeneration += 1
+        let generation = coastGeneration
+
+        let current: Double
+        if let spinStart {
+            current = spinRotation(at: Date())
+            self.spinStart = nil
+        } else if let coastRotation {
+            current = coastRotation
+        } else {
+            resetRotationSilently()
+            return
+        }
+
+        let minimumTarget = spinOrigin + 360
+        let remainder = current.truncatingRemainder(dividingBy: 360)
+        let boundaryTarget = remainder > 1 ? current + (360 - remainder) : current
+        let target = max(boundaryTarget, minimumTarget)
+
+        guard target - current > 1 else {
+            resetRotationSilently()
+            return
+        }
+
+        coastRotation = current
+        withAnimation(Motion.standard) {
+            coastRotation = target
+        } completion: {
+            finishCoast(expectedGeneration: generation)
+        }
+    }
+
+    private func resetRotationSilently() {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            spinOrigin = 0
+            spinStart = nil
+            coastRotation = nil
+        }
+    }
+
+    private func finishCoast(expectedGeneration: UInt) {
+        guard coastGeneration == expectedGeneration, coastRotation != nil else { return }
+        resetRotationSilently()
     }
 }
 
@@ -293,61 +464,75 @@ struct UpdateStatusIndicator: View {
     var canDismiss: Bool = false
     var onDismiss: (() -> Void)?
     var size: Size = .regular
+    var showsManualRefresh: Bool = false
+    var onManualRefresh: (() async -> Void)?
+
+    private var chipPhase: UpdateStatusChipPhase {
+        UpdateStatusChipPhase(status)
+    }
+
+    private var showsRefreshIcon: Bool {
+        showsManualRefresh && (chipPhase == .upToDate || chipPhase == .checking)
+    }
 
     var body: some View {
-        content
+        if chipPhase == .hidden {
+            EmptyView()
+        } else {
+            HStack(spacing: Spacing.xs) {
+                chip
+                trailingRefreshControl
+            }
+            .geometryGroup()
+            .animation(Motion.standard, value: chipPhase)
+        }
     }
 
     @ViewBuilder
-    private var content: some View {
-        switch status {
-        case .available(let latestVersion, let releaseURL):
-            UpdateStatusBadge(
-                text: "Update available: v\(latestVersion)",
-                systemImage: "arrow.down.circle.fill",
-                tint: .white,
-                background: .brand,
-                actionURL: releaseURL,
-                dismissAction: canDismiss ? onDismiss : nil,
-                usesBrandGlass: true,
-                size: size
-            )
+    private var chip: some View {
+        let badge = UpdateStatusBadge(
+            text: chipPhase.title,
+            systemImage: chipPhase.systemImage,
+            tint: chipPhase.usesBrandGlass ? .white : .secondary,
+            background: chipPhase.usesBrandGlass ? .brand : Color.secondary.opacity(0.12),
+            actionURL: releaseURL,
+            dismissAction: canDismiss ? onDismiss : nil,
+            usesBrandGlass: chipPhase.usesBrandGlass,
+            size: size,
+            animationPhase: chipPhase
+        )
 
-        case .upToDate:
-            UpdateStatusBadge(
-                text: "Up to date",
-                systemImage: "checkmark.circle",
-                tint: .secondary,
-                background: Color.secondary.opacity(0.12),
-                size: size
-            )
-
-        case .checking:
-            UpdateStatusBadge(
-                text: "Checking for updates...",
-                systemImage: nil,
-                tint: .secondary,
-                background: Color.secondary.opacity(0.12),
-                showsProgress: true,
-                size: size
-            )
-
-        case .failed:
+        if chipPhase == .failed {
             Button {
                 Task { await onTapRetry() }
             } label: {
-                UpdateStatusBadge(
-                    text: "Retry update check",
-                    systemImage: "exclamationmark.triangle",
-                    tint: .secondary,
-                    background: Color.secondary.opacity(0.12),
-                    size: size
-                )
+                badge
             }
             .buttonStyle(.plain)
+        } else {
+            badge
+        }
+    }
 
-        case .unknown:
-            EmptyView()
+    private var releaseURL: URL? {
+        guard case .available(_, let url) = status else { return nil }
+        return url
+    }
+
+    @ViewBuilder
+    private var trailingRefreshControl: some View {
+        if showsRefreshIcon {
+            Button {
+                Task { await onManualRefresh?() }
+            } label: {
+                RefreshSpinIcon(spinning: chipPhase == .checking, size: size)
+            }
+            .buttonStyle(.plain)
+            .disabled(chipPhase == .checking)
+            .accessibilityLabel(
+                chipPhase == .checking ? "Checking for updates" : "Check for updates"
+            )
+            .transition(.identity)
         }
     }
 }
@@ -359,9 +544,9 @@ struct UpdateStatusBadge: View {
     let background: Color
     var actionURL: URL?
     var dismissAction: (() -> Void)?
-    var showsProgress: Bool = false
     var usesBrandGlass: Bool = false
     var size: UpdateStatusIndicator.Size = .regular
+    fileprivate var animationPhase: UpdateStatusChipPhase?
 
     var body: some View {
         Group {
@@ -384,8 +569,8 @@ struct UpdateStatusBadge: View {
                     .clipShape(Capsule())
             }
         }
-        .contentTransition(.numericText())
         .fixedSize(horizontal: true, vertical: false)
+        .animation(Motion.standard, value: animationPhase ?? .hidden)
     }
 
     private var badgeContent: some View {
@@ -416,17 +601,17 @@ struct UpdateStatusBadge: View {
 
     private var label: some View {
         HStack(spacing: Spacing.sm) {
-            if showsProgress {
-                ProgressView()
-                    .controlSize(.small)
-                    .tint(tint)
-            } else if let systemImage {
+            if let systemImage {
                 Image(systemName: systemImage)
                     .imageScale(iconScale)
+                    .id(systemImage)
+                    .transition(.blurReplace)
             }
 
             Text(text)
                 .lineLimit(1)
+                .contentTransition(.numericText())
+                .transition(.blurReplace)
         }
     }
 

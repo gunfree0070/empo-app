@@ -40,7 +40,6 @@ struct GameLibraryView: View {
     @State private var gameSizes: [String: Int64] = [:]
     @State private var sizesTask: Task<Void, Never>?
     @State private var importWorkflow = ImportWorkflowController()
-    @State private var updateStatus: UpdateChecker.Status = .unknown
     @AppStorage("GameLibraryView.updateBannerDismissed") private var updateBannerDismissed = false
     /// Per-game record of which visual source triggered the most recent
     /// navigation into the player. Drives `.navigationTransition(.zoom)`
@@ -154,11 +153,6 @@ struct GameLibraryView: View {
             }
             .task {
                 refreshGameSizes()
-            }
-            .task {
-                guard UpdateChecker.isSideloadOrDevBuild else { return }
-                updateStatus = .checking
-                updateStatus = await UpdateChecker.checkIfStale()
             }
     }
 
@@ -278,7 +272,7 @@ struct GameLibraryView: View {
 
     private var showsUpdateBanner: Bool {
         guard !selectionMode, !updateBannerDismissed else { return false }
-        guard case .available = updateStatus else { return false }
+        guard case .available = appState.updateStatus else { return false }
         return true
     }
 
@@ -331,10 +325,9 @@ struct GameLibraryView: View {
 
     private var libraryUpdateBanner: some View {
         UpdateStatusIndicator(
-            status: updateStatus,
+            status: appState.updateStatus,
             onTapRetry: {
-                updateStatus = .checking
-                updateStatus = await UpdateChecker.checkNow()
+                await appState.checkForUpdatesNow()
             },
             canDismiss: true,
             onDismiss: {

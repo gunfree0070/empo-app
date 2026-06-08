@@ -20,6 +20,9 @@ class AppState {
     /// view reads this after the user dismisses the alert to
     /// switch from spinner to error content.
     var sessionHadError = false
+    /// Latest release check result for sideload/dev builds. Filled at
+    /// launch from `RootView`; Settings and the library banner read it.
+    var updateStatus: UpdateChecker.Status = .unknown
     private var terminationExpected = false
 
     private let crashTracker = CrashTracker()
@@ -27,6 +30,24 @@ class AppState {
     private let termination = EngineTerminationCoordinator()
 
     var pendingCrashRecovery: Bool { crashTracker.pendingCrashRecovery }
+
+    func checkForUpdatesIfStale() async {
+        guard UpdateChecker.isSideloadOrDevBuild else { return }
+        updateStatus = .checking
+        let result = await UpdateChecker.checkIfStale()
+        withAnimation(Motion.standard) {
+            updateStatus = result
+        }
+    }
+
+    func checkForUpdatesNow() async {
+        guard UpdateChecker.isSideloadOrDevBuild else { return }
+        updateStatus = .checking
+        let result = await UpdateChecker.checkNow()
+        withAnimation(Motion.standard) {
+            updateStatus = result
+        }
+    }
 
     private init() {
         SaveMigration.migrateAllDiscoveredGamesIfNeeded()
