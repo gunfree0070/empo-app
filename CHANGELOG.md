@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.3 - 2026-06-08
+
+### Bug Fixes
+
+- Cache compatibility auto-detect and re-sniff on reset ([`38512ec`](https://github.com/mateo-m/empo-app/commit/38512ec4873601de3b7ae782d650e3da48a5f6ac))
+- Clean up failed imports and improve import UX ([`e7110d7`](https://github.com/mateo-m/empo-app/commit/e7110d7716a75a7f43e98c78a25fccca4453614b))
+- Improve update banner dismiss and interactions ([`eca9cbd`](https://github.com/mateo-m/empo-app/commit/eca9cbd63a1dfdec9b6c57f81f222222fb7da58d))
+
 ## 0.2.2 - 2026-06-08
 
 ### Bug Fixes
