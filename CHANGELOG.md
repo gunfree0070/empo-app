@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.2 - 2026-06-08
+
+### Bug Fixes
+
+- Update mkxp for exact-path bitmap resolution ([`1b3c299`](https://github.com/mateo-m/empo-app/commit/1b3c2991ddcb483f1f87eb918fd85ee970996128))
+
+### Features
+
+- Check at launch and add manual refresh control ([`a735947`](https://github.com/mateo-m/empo-app/commit/a73594707ca7cfbcf30691669f46cd12f2661c8e))
+
+### Release
+
+- Sync altstore source in release script ([`fb4f968`](https://github.com/mateo-m/empo-app/commit/fb4f9685832be5a5d78c6f025c47b08233fe06b0))
+
 ## 0.2.1 - 2026-06-06
 
 ### Bug Fixes
