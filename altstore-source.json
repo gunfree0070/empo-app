@@ -25,6 +25,15 @@
       ],
       "versions": [
         {
+          "version": "0.2.2",
+          "buildVersion": "356",
+          "date": "2026-06-08",
+          "localizedDescription": "### Bug Fixes\n\n- Update mkxp for exact-path bitmap resolution ([`1b3c299`](https://github.com/mateo-m/empo-app/commit/1b3c2991ddcb483f1f87eb918fd85ee970996128))\n\n### Features\n\n- Check at launch and add manual refresh control ([`a735947`](https://github.com/mateo-m/empo-app/commit/a73594707ca7cfbcf30691669f46cd12f2661c8e))\n\n### Release\n\n- Sync altstore source in release script ([`fb4f968`](https://github.com/mateo-m/empo-app/commit/fb4f9685832be5a5d78c6f025c47b08233fe06b0))",
+          "downloadURL": "https://github.com/mateo-m/empo-app/releases/download/v0.2.2/Empo-0.2.2-unsigned.ipa",
+          "size": 19663791,
+          "minOSVersion": "26.0"
+        },
+        {
           "version": "0.2.1",
           "buildVersion": "352",
           "date": "2026-06-06",
