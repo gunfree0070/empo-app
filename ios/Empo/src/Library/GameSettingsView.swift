@@ -101,12 +101,10 @@ struct GameSettingsView: View {
     /// version the detector picked - so users can see what
     /// Auto-detect would route to without flipping the override.
     @State private var autoDetectedVersion: Int?
-    /// Cached result of `GameSettings.detectModernRubyScripts`,
-    /// populated by the sheet's `.task`. Used to dress the
-    /// "Auto-detect" row of the compatibility picker. nil while
-    /// the scan runs (the scanner reads up to 64 MB of native
-    /// binaries and walks loose .rb files; we don't want that on
-    /// every picker render).
+    /// Cached modern-Ruby classification from
+    /// `metadata.modernRubyScriptsDetected`, populated when the sheet
+    /// opens or after Reset to Defaults. Used to dress the
+    /// "Auto-detect" row of the compatibility picker.
     @State private var autoDetectedModernScripts: Bool?
 
     private let gameDirectory: URL
@@ -241,10 +239,7 @@ struct GameSettingsView: View {
                 if settings.hasCustomizations {
                     Section {
                         Button("Reset to Defaults", role: .destructive) {
-                            withAnimation {
-                                settings = GameSettings()
-                                defaults = GameSettings.readGameDefaults(from: gameDirectory)
-                            }
+                            resetToDefaults()
                         }
                     } footer: {
                         Text("Remove all custom settings and use the game's original values.")
@@ -311,22 +306,7 @@ struct GameSettingsView: View {
             }
             .onChange(of: settings) { save() }
             .task {
-                // Read the import-time auto-detected Ruby version
-                // from metadata so the "Auto-detect" picker row
-                // shows what would be routed to.
-                if let container = game.container {
-                    let metadata = GameMetadata.load(from: container)
-                    autoDetectedVersion = metadata.rubyVersion
-                }
-                // Run the modern-Ruby scanner on a background task
-                // so the picker can show what the Auto-detect row
-                // would resolve to without hitching the main
-                // thread on every render.
-                let dir = gameDirectory
-                let modern = await Task.detached(priority: .userInitiated) {
-                    GameSettings.detectModernRubyScripts(in: dir)
-                }.value
-                autoDetectedModernScripts = modern
+                refreshAutoDetection(forceRefresh: false)
             }
         }
         .tint(.brand)
@@ -704,6 +684,30 @@ struct GameSettingsView: View {
         // was launched with - making toggles like Smooth Scaling,
         // Vsync, and Resolution appear to do nothing.
         settings.applyToConfig(stateDirectory: stateDirectory, gameDirectory: gameDirectory)
+    }
+
+    private func resetToDefaults() {
+        withAnimation {
+            settings = GameSettings()
+            defaults = GameSettings.readGameDefaults(from: gameDirectory)
+        }
+        Task {
+            refreshAutoDetection(forceRefresh: true)
+        }
+    }
+
+    /// Loads or re-runs the Ruby-version and compatibility-mode
+    /// sniffers so the Auto-detect picker rows reflect what the
+    /// engine would route to. Reads cached metadata on sheet open;
+    /// `forceRefresh` re-sniffs the game folder and rewrites
+    /// `metadata.json` (Reset to Defaults).
+    private func refreshAutoDetection(forceRefresh: Bool) {
+        guard let container = game.container else { return }
+        var metadata = GameMetadata.load(from: container)
+        metadata.refreshDetectedRubyVersion(in: container, forceRefresh: forceRefresh)
+        metadata.refreshDetectedModernRubyScripts(in: container, forceRefresh: forceRefresh)
+        autoDetectedVersion = metadata.rubyVersion
+        autoDetectedModernScripts = metadata.modernRubyScriptsDetected
     }
 }
 

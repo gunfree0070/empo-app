@@ -207,6 +207,7 @@ class GameLibrary {
         var metadata = GameMetadata.load(from: container)
         if settings.allowsRubyAutoDetectRefresh {
             metadata.refreshDetectedRubyVersion(in: container)
+            metadata.refreshDetectedModernRubyScripts(in: container)
         }
         // Title priority: user's customTitle > import-time baseTitle
         // (JGP manifest name) > Game.ini title. The `engineTitle`
@@ -855,6 +856,11 @@ class GameLibrary {
             gameDirectory: container.gameURL
         )
         metadata.rubyVersionDetectedSchema = RubyVersionDetection.currentSchema.rawValue
+        metadata.modernRubyScriptsDetected = GameSettings.detectModernRubyScripts(
+            in: container.gameURL
+        )
+        metadata.modernRubyScriptsDetectedSchema =
+            ModernRubyDetection.currentSchema.rawValue
 
         if let iconData = bundle.iconData,
             let image = UIImage(data: iconData),
@@ -879,6 +885,11 @@ class GameLibrary {
             gameDirectory: container.gameURL
         )
         metadata.rubyVersionDetectedSchema = RubyVersionDetection.currentSchema.rawValue
+        metadata.modernRubyScriptsDetected = GameSettings.detectModernRubyScripts(
+            in: container.gameURL
+        )
+        metadata.modernRubyScriptsDetectedSchema =
+            ModernRubyDetection.currentSchema.rawValue
         metadata.save(to: container)
     }
 
@@ -898,6 +909,11 @@ class GameLibrary {
         settings.useModernRuby = true
         settings.applyToConfig(stateDirectory: stateDir, gameDirectory: container.gameURL)
         settings.save(to: stateDir)
+        var metadata = GameMetadata.load(from: container)
+        metadata.modernRubyScriptsDetected = true
+        metadata.modernRubyScriptsDetectedSchema =
+            ModernRubyDetection.currentSchema.rawValue
+        metadata.save(to: container)
     }
 
     func deleteGame(_ entry: GameEntry, onError: (@MainActor @Sendable (String) -> Void)? = nil) {

@@ -44,6 +44,18 @@ enum RenderScale: String, Codable, CaseIterable, Hashable {
     }
 }
 
+/// Schema versioning for `GameSettings.detectModernRubyScripts`.
+/// Bump `currentSchema` when heuristics change so library load and
+/// launch re-sniff stale metadata the same way Ruby-version
+/// detection does.
+enum ModernRubyDetection {
+    enum Schema: String {
+        case initial
+    }
+
+    static let currentSchema: Schema = .initial
+}
+
 enum VerticalAlignment: String, Codable, CaseIterable {
     case top
     case topCenter
@@ -558,20 +570,19 @@ struct GameSettings: Codable, Equatable {
     /// 1.8 transform would mis-parse, so we DISABLE the transform
     /// for those.
     ///
-    /// Auto-detect runs the scanner at every launch so games
-    /// imported before a scanner fix can recover. Concrete case:
-    /// Infinite Fusion has 541 .rb files scattered in
-    /// `Data/Scripts/NNN_*/` and uses inline keyword-args
-    /// (`Game.save(safe: safesave)`); the original detector's
-    /// 200-file cap + line-start-anchored regex missed it, so the
-    /// game was stuck in LEGACY mode and Ruby 3.1 rejected `safe:`
-    /// as "unexpected ':'". With the improved scanner run at
-    /// launch, the mode flips to DISABLED and the game parses
-    /// cleanly.
-    func resolveSyntaxTransformMode(gameDirectory: URL) -> MKXPSyntaxTransformMode {
+    /// Auto-detect reads `metadata.modernRubyScriptsDetected`
+    /// (refreshed at import, library load, launch, and Reset to
+    /// Defaults when `useModernRuby` is nil). Falls back to an
+    /// on-demand scan only when metadata has no cached value yet.
+    func resolveSyntaxTransformMode(
+        gameDirectory: URL,
+        autoDetectedModern: Bool? = nil
+    ) -> MKXPSyntaxTransformMode {
         let modern: Bool
         if let m = useModernRuby {
             modern = m
+        } else if let detected = autoDetectedModern {
+            modern = detected
         } else {
             modern = Self.detectModernRubyScripts(in: gameDirectory)
         }

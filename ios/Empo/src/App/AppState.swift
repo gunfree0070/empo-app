@@ -92,6 +92,28 @@ class AppState {
 
         let settings = GameSettings.load(from: stateDir)
 
+        // Multi-Ruby (Phase D, MULTI_RUBY_PLAN.md) per-game dispatch.
+        // Precedence:
+        //   1. settings.rubyVersionOverride (manual user pick in
+        //      GameSettingsView's Ruby version picker)
+        //   2. metadata.rubyVersion (auto-detected at import time
+        //      by RubyVersionDetection)
+        //   3. MKXP_RUBY_UNSET → engine falls through to its
+        //      legacy direct-link 3.1 path. Hit when neither
+        //      override nor detection has tagged a value, e.g.
+        //      games imported before this field existed if the
+        //      backfill hasn't run yet.
+        var metadata = GameMetadata.load(from: container)
+        if settings.allowsRubyAutoDetectRefresh {
+            // Re-run auto-detection at launch so upgraded installs
+            // recover from stale persisted values even if the library
+            // screen didn't refresh this container yet. Respect any
+            // explicit Ruby-version or compatibility-mode choice by
+            // leaving their last auto-detected value untouched.
+            metadata.refreshDetectedRubyVersion(in: container, forceRefresh: true)
+            metadata.refreshDetectedModernRubyScripts(in: container, forceRefresh: true)
+        }
+
         // syntaxTransform travels via the bridge, NOT mkxp.json,
         // so mkxp.json stays a clean mirror of the developer's
         // engine-config layer. Has to be set before the engine
@@ -106,29 +128,11 @@ class AppState {
         // runtime methods. Games on 1.8/1.9/3.0 native ignore
         // this setting (no patches in those builds).
         mkxp_setSyntaxTransformMode(
-            settings.resolveSyntaxTransformMode(gameDirectory: gameDir)
+            settings.resolveSyntaxTransformMode(
+                gameDirectory: gameDir,
+                autoDetectedModern: metadata.modernRubyScriptsDetected
+            )
         )
-
-        // Multi-Ruby (Phase D, MULTI_RUBY_PLAN.md) per-game dispatch.
-        // Precedence:
-        //   1. settings.rubyVersionOverride (manual user pick in
-        //      GameSettingsView's Ruby version picker)
-        //   2. metadata.rubyVersion (auto-detected at import time
-        //      by RubyVersionDetection)
-        //   3. MKXP_RUBY_UNSET → engine falls through to its
-        //      legacy direct-link 3.1 path. Hit when neither
-        //      override nor detection has tagged a value, e.g.
-        //      games imported before this field existed if the
-        //      backfill hasn't run yet.
-        var metadata = GameMetadata.load(from: container)
-        if settings.allowsRubyAutoDetectRefresh {
-            // Re-run Ruby auto-detection at launch so upgraded installs
-            // recover from stale persisted values even if the library
-            // screen didn't refresh this container yet. Respect any
-            // explicit Ruby-version or compatibility-mode choice by
-            // leaving their last auto-detected value untouched.
-            metadata.refreshDetectedRubyVersion(in: container, forceRefresh: true)
-        }
         let rubyVersionRaw = settings.rubyVersionOverride ?? metadata.rubyVersion
         let rubyVer: MKXPRubyVersion = {
             switch rubyVersionRaw {

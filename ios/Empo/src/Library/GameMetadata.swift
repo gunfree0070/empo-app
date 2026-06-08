@@ -64,6 +64,18 @@ struct GameMetadata: Codable {
     // affects the auto-detected default.
     var rubyVersionDetectedSchema: String?
 
+    // Whether auto-detect classifies this game's scripts as modern
+    // Ruby 3 syntax (true = Modern / no syntax transform; false =
+    // Legacy). Populated at import and refreshed when
+    // `useModernRuby` is nil, same lifecycle as `rubyVersion`.
+    // `GameSettings.useModernRuby` override still wins.
+    var modernRubyScriptsDetected: Bool?
+
+    // Schema id for the heuristic that produced
+    // `modernRubyScriptsDetected`. Same forward-compat pattern as
+    // `rubyVersionDetectedSchema`.
+    var modernRubyScriptsDetectedSchema: String?
+
     init() {}
 
     /// Field-by-field decode. The synthesized `Codable.init(from:)`
@@ -93,6 +105,10 @@ struct GameMetadata: Codable {
         rubyVersion = (try? c.decodeIfPresent(Int.self, forKey: .rubyVersion))
         rubyVersionDetectedSchema =
             (try? c.decodeIfPresent(String.self, forKey: .rubyVersionDetectedSchema))
+        modernRubyScriptsDetected =
+            (try? c.decodeIfPresent(Bool.self, forKey: .modernRubyScriptsDetected))
+        modernRubyScriptsDetectedSchema =
+            (try? c.decodeIfPresent(String.self, forKey: .modernRubyScriptsDetectedSchema))
     }
 
     static func load(from container: GameContainer) -> GameMetadata {
@@ -146,6 +162,27 @@ struct GameMetadata: Codable {
         )
         rubyVersion = detectedVersion
         rubyVersionDetectedSchema = currentSchema
+        save(to: container)
+    }
+
+    /// Refresh the auto-detected modern-Ruby script classification
+    /// if missing, produced by older heuristics, or the caller
+    /// wants a fresh sniff (Reset to Defaults / game launch).
+    mutating func refreshDetectedModernRubyScripts(
+        in container: GameContainer,
+        forceRefresh: Bool = false
+    ) {
+        let currentSchema = ModernRubyDetection.currentSchema.rawValue
+        let needsDetect =
+            forceRefresh
+            || modernRubyScriptsDetected == nil
+            || modernRubyScriptsDetectedSchema != currentSchema
+        guard needsDetect else { return }
+
+        modernRubyScriptsDetected = GameSettings.detectModernRubyScripts(
+            in: container.gameURL
+        )
+        modernRubyScriptsDetectedSchema = currentSchema
         save(to: container)
     }
 
