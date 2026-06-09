@@ -209,6 +209,12 @@ targets:
         # so changing a branch / commit / dirty state wouldn't be
         # reflected in the app until a clean build.
         basedOnDependencyAnalysis: false
+        # Register the generated Swift file with the target. It's
+        # gitignored so the `src` group scan won't pick it up; without
+        # this + the explicit source entry below, Release builds fail
+        # with "Cannot find 'GitInfo' in scope".
+        outputFiles:
+          - $(PROJECT_DIR)/src/App/GitInfo.generated.swift
         script: |
           REPO="${PROJECT_DIR}/../.."
           COMMIT=$(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || echo "unknown")
@@ -313,6 +319,10 @@ targets:
       - path: ../../mkxp-z-apple-mobile/src/angle_native_layer.mm
       - path: src
         type: group
+      # Gitignored generated file; listed explicitly so xcodegen keeps
+      # it in Compile Sources after `src` group scans skip ignored paths.
+      - path: src/App/GitInfo.generated.swift
+        optional: true
       - path: PrivacyInfo.xcprivacy
       - path: Assets.xcassets
       - path: Assets.bundle

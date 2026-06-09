@@ -58,20 +58,6 @@ _mkxp_ruby18_setjmp:
 
     .globl _mkxp_ruby18_longjmp
 _mkxp_ruby18_longjmp:
-    // DEBUG: log entry. Save callee-saved scratch first.
-    stp x29, x30, [sp, #-32]!
-    mov x29, sp
-    stp x0, x1, [sp, #16]    // save jmp_buf and val for after log
-    adrp x0, Lmkxp_lj_tag@PAGE
-    add  x0, x0, Lmkxp_lj_tag@PAGEOFF
-    adrp x1, Lmkxp_lj_src@PAGE
-    add  x1, x1, Lmkxp_lj_src@PAGEOFF
-    adrp x2, Lmkxp_lj_msg@PAGE
-    add  x2, x2, Lmkxp_lj_msg@PAGEOFF
-    bl   _mkxp_debugLog
-    ldp x0, x1, [sp, #16]    // restore jmp_buf and val
-    ldp x29, x30, [sp], #32
-
     ldp x19, x20, [x0,  #0]
     ldp x21, x22, [x0, #16]
     ldp x23, x24, [x0, #32]
@@ -90,14 +76,5 @@ _mkxp_ruby18_longjmp:
     cmp w1, #0
     csel w0, w1, w2, ne
     ret                   // br x30, no PAC verify
-
-    .section __TEXT,__cstring,cstring_literals
-Lmkxp_lj_tag:
-    .asciz "MKXP18-ASM"
-Lmkxp_lj_src:
-    .asciz "longjmp"
-Lmkxp_lj_msg:
-    .asciz "asm longjmp entry, about to restore registers"
-    .text
 
 #endif
