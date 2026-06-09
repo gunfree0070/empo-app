@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.5 - 2026-06-09
+
+### Bug Fixes
+
+- Register GitInfo in xcodegen and update mkxp for Ruby 1.8 boot ([`cac317b`](https://github.com/mateo-m/empo-app/commit/cac317b609083774b527988ead1c83a6f1dec52e))
+
 ## 0.2.4 - 2026-06-09
 
 ### Bug Fixes
