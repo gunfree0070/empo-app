@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.4 - 2026-06-09
+
+### Bug Fixes
+
+- Harden device deps pipeline and error alert handling ([`8b7954b`](https://github.com/mateo-m/empo-app/commit/8b7954b0dafbdf0ae5d37cbca743b44418d5ba35))
+- Patch Ruby 1.8 cross-compile fake template ([`561c94e`](https://github.com/mateo-m/empo-app/commit/561c94eebabbff4142333fe4e1fc52282a61ee2b))
+- Fix Ruby 1.8 cross-compile on modern macOS hosts ([`e1bf18f`](https://github.com/mateo-m/empo-app/commit/e1bf18f8788de3975fe6d3f9c7ada0b0b0cf9794))
+- Point Ruby 3.1 openssl ext at device OpenSSL ([`47a5477`](https://github.com/mateo-m/empo-app/commit/47a5477660b8fd24639ff6d26b57880dacabd8a5))
+
 ## 0.2.3 - 2026-06-08
 
 ### Bug Fixes
