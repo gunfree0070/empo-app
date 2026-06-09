@@ -998,6 +998,7 @@ $(SOURCES)/ruby18/configure: $(SOURCES)/ruby18/configure.in
 	git checkout -- . 2>/dev/null; \
 	git clean -fdx 2>/dev/null; \
 	git apply $(PATCHES)/ruby18/ios.patch; \
+	git apply $(PATCHES)/ruby18/cross-host.patch; \
 	autoconf
 
 # ====
