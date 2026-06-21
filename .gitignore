@@ -2,6 +2,7 @@
 demo/
 
 # Build artifacts
+.build/
 ios/Empo/build/
 ios/Empo/Empo.xcodeproj/
 *.ipa
@@ -19,6 +20,11 @@ ios/Dependencies/ANGLE/iphoneos/lib/
 ios/Dependencies/ANGLE/iphonesimulator/include/
 ios/Dependencies/ANGLE/iphonesimulator/lib/
 ios/Dependencies/ANGLE/.fetched-version
+
+# Native deps (OpenSSL/SDL/Ruby/mkxp-merged) — hydrated by
+# tools/fetch-native-deps.sh from empo-deps release assets. Version-pinned
+# via ios/Dependencies/native/.version (tracked).
+ios/Dependencies/native/.fetched-version
 
 # MetalANGLE.xcframework - unreferenced by the build, kept untracked
 # in case anything ever needs it. Currently not in the working tree.

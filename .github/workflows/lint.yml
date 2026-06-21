@@ -106,20 +106,20 @@ jobs:
 
       - name: shellcheck
         run: |
-          FILES=$(git ls-files 'setup.sh' 'tools/*.sh' 'scripts/hooks/*.sh')
+          FILES=$(git ls-files 'setup.sh' 'tools/*.sh' 'scripts/*.sh' 'scripts/hooks/*.sh')
           if [ -n "$FILES" ]; then
             echo "$FILES" | xargs shellcheck
           fi
 
       - name: shfmt check
         run: |
-          FILES=$(git ls-files 'setup.sh' 'tools/*.sh' 'scripts/hooks/*.sh')
+          FILES=$(git ls-files 'setup.sh' 'tools/*.sh' 'scripts/*.sh' 'scripts/hooks/*.sh')
           if [ -n "$FILES" ]; then
             echo "$FILES" | xargs shfmt -d -i 4 -ci
           fi
 
   yaml:
-    name: YAML (prettier + yamllint)
+    name: YAML (oxfmt + yamllint)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -137,12 +137,8 @@ jobs:
           packages: yamllint
           version: "1.0"
 
-      - name: prettier check (YAML + JSON)
-        run: |
-          bun x prettier --check \
-            'altstore-source.json' \
-            'ios/Empo/project.yml' \
-            'ios/Empo/curated-patches/gameRegistry.json'
+      - name: oxfmt check (YAML + JSON)
+        run: bun run fmt:check
 
       - name: yamllint
         run: |

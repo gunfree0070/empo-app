@@ -14,7 +14,7 @@
 
 Empo wraps the [mkxp-z](https://github.com/mkxp-z/mkxp-z) RPG Maker engine in a native SwiftUI library and a customizable touch-controls overlay. RPG Maker XP / VX / VX Ace games and modern Pokemon Essentials forks run on-device, no desktop emulator needed.
 
-The name's from *emporos*, ancient Greek for a traveler riding on someone else's ship.
+The name's from _emporos_, ancient Greek for a traveler riding on someone else's ship.
 
 ## Demo
 
@@ -28,8 +28,8 @@ https://github.com/user-attachments/assets/1a6de8a7-b47c-4ad4-8df9-f028347dfb9c
 
 In-game battle:
 
-| Cinematic | Battle | Overworld |
-| :-: | :-: | :-: |
+|                  Cinematic                  |                Battle                 |                  Overworld                  |
+| :-----------------------------------------: | :-----------------------------------: | :-----------------------------------------: |
 | ![Cinematic](docs/media/demo-cinematic.png) | ![Battle](docs/media/demo-battle.png) | ![Overworld](docs/media/demo-overworld.png) |
 
 ## Table of Contents
@@ -89,12 +89,12 @@ The engine doesn't know the app exists and the app doesn't include any engine he
 
 For deeper architectural context:
 
-| Doc | What it covers |
-|---|---|
-| [`docs/multi-ruby.md`](docs/multi-ruby.md) | How four Ruby interpreters live in one binary, and how the right one gets picked per game. |
+| Doc                                                            | What it covers                                                                                   |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| [`docs/multi-ruby.md`](docs/multi-ruby.md)                     | How four Ruby interpreters live in one binary, and how the right one gets picked per game.       |
 | [`docs/sdl-ruby-workarounds.md`](docs/sdl-ruby-workarounds.md) | Why SDL, the GL context, OpenAL, and the active Ruby VM are persistent for the process lifetime. |
-| [`docs/pause-resume.md`](docs/pause-resume.md) | Frozen-frame snapshots that bridge the SDL window into SwiftUI transitions. |
-| [`docs/multi-session.md`](docs/multi-session.md) | Why cross-session play is currently disabled. |
+| [`docs/pause-resume.md`](docs/pause-resume.md)                 | Frozen-frame snapshots that bridge the SDL window into SwiftUI transitions.                      |
+| [`docs/multi-session.md`](docs/multi-session.md)               | Why cross-session play is currently disabled.                                                    |
 
 ## Notable hacks
 
@@ -115,30 +115,39 @@ A few load-bearing tricks worth flagging if you're poking around:
 
 ## Build
 
-```sh
-# Tools
-brew install bun xcodegen autoconf automake libtool cmake pkg-config
+Native libraries (OpenSSL, SDL, Ruby, mkxp-merged) ship as **prebuilt trees per SDK**, same model as ANGLE. After cloning:
 
-# Repo (recursive for submodules)
+```sh
+brew install bun xcodegen gh autoconf automake libtool cmake pkg-config
 git clone --recursive git@github.com:mateo-m/empo-app.git
 cd empo-app
-
-# Install repo-managed hooks for empo-app.
 bun install
 
-# If you'll also commit inside the mkxp submodule, install its hooks too.
-(cd mkxp-z-apple-mobile && bun install)
-
-# Cross-compile third-party deps. Slow on first run, cached after.
-make -C ios/Dependencies -f iphonesimulator.make deps-core
-
-# Generate the Xcode project and build the app
+# Hydrate ANGLE + native deps (downloads from empo-deps when published,
+# or uses locally-built trees — see below)
 xcodegen generate --spec ios/Empo/project.yml --project ios/Empo
 xcodebuild -project ios/Empo/Empo.xcodeproj -target Empo \
   -sdk iphonesimulator -arch arm64 -configuration Debug build
 ```
 
-Install on a booted simulator:
+### First-time / dep-bump setup
+
+When `ios/Dependencies/native/.version` is still `unpublished`, or you changed a dependency version, build **both** SDK trees once (sequential — do not `make -j` everything):
+
+```sh
+scripts/rebuild-all-native-deps.sh
+tools/package-native-deps.sh native-$(date +%Y-%m-%d)
+# upload tarball to empo-deps, commit ios/Dependencies/native/.version
+```
+
+Verify a single tree:
+
+```sh
+PLATFORM_NAME=iphoneos scripts/verify-native-deps.sh
+PLATFORM_NAME=iphonesimulator scripts/verify-native-deps.sh
+```
+
+### Simulator install
 
 ```sh
 SIM=$(xcrun simctl list devices booted | grep -oE '[0-9A-F-]{36}' | head -1)
