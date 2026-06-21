@@ -200,7 +200,7 @@ enum PatcherDistribution {
     /// Returns nil if the file is missing or has no Title.
     private static func readIniTitle(gameURL: URL) -> String? {
         let iniURL = gameURL.appendingPathComponent("Game.ini")
-        return GameEntry.parseINIValue(in: iniURL, section: "game", key: "title")
+        return GameINI.parseINIValue(in: iniURL, section: "game", key: "title")
     }
 
     private static func stripLineComments(in data: Data) -> Data? {

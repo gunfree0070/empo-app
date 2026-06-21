@@ -69,15 +69,4 @@ struct GameEntry: Identifiable, Hashable {
             && lhs.dateAdded == rhs.dateAdded
     }
 
-    static func parseINITitle(at gameDir: URL) -> String? {
-        GameINI.parseINIValue(at: gameDir, section: "game", key: "title")
-    }
-
-    static func parseINIValue(at gameDir: URL, section: String, key: String) -> String? {
-        GameINI.parseINIValue(at: gameDir, section: section, key: key)
-    }
-
-    static func parseINIValue(in iniURL: URL, section: String, key: String) -> String? {
-        GameINI.parseINIValue(in: iniURL, section: section, key: key)
-    }
 }

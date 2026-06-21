@@ -455,7 +455,7 @@ class GameLibrary {
 
         // Pre-flight passed - commit the progress card so the rest
         // of the import has a visible home for progress/cancel UI.
-        let title = GameEntry.parseINITitle(at: gameRoot) ?? sourceName
+        let title = GameINI.parseINIValue(at: gameRoot, section: "game", key: "title") ?? sourceName
         let container = GameContainer(id: importID, slug: GameContainer.slugify(title))
 
         // Lazy: write the exe-icon sidecar into Metadata/ from the
@@ -539,7 +539,7 @@ class GameLibrary {
         // `.ini` so the committed card shows the real name while the
         // rest of the archive extracts in the background. Artwork
         // fills in mid-extract via the extract() callback below.
-        let title = GameEntry.parseINITitle(at: preflightRoot) ?? sourceName
+        let title = GameINI.parseINIValue(at: preflightRoot, section: "game", key: "title") ?? sourceName
         let container = GameContainer(id: importID, slug: GameContainer.slugify(title))
         commitPendingToCard(
             importID, container: container,

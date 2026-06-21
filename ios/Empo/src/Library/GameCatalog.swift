@@ -47,7 +47,9 @@ enum GameCatalog {
         from container: GameContainer,
         fm: FileManager = .default
     ) -> GameEntry? {
-        let iniTitle = GameEntry.parseINITitle(at: container.gameURL) ?? "Unknown Game"
+        let iniTitle =
+            GameINI.parseINIValue(at: container.gameURL, section: "game", key: "title")
+            ?? "Unknown Game"
         let defaultArtwork = findArtwork(in: container)
 
         let settings = GameSettings.load(from: container.empoStateURL)

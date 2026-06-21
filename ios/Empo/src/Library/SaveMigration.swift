@@ -69,13 +69,16 @@ enum SaveMigration {
             let org = normalizedPathComponent(object["dataPathOrg"] as? String) ?? "."
             let app =
                 normalizedPathComponent(object["dataPathApp"] as? String)
-                ?? normalizedPathComponent(GameEntry.parseINITitle(at: gameDir))
+                ?? normalizedPathComponent(
+                    GameINI.parseINIValue(at: gameDir, section: "game", key: "title"))
                 ?? "mkxp-z"
             return (org, app)
         }
 
         let org = "."
-        let app = normalizedPathComponent(GameEntry.parseINITitle(at: gameDir)) ?? "mkxp-z"
+        let app =
+            normalizedPathComponent(
+                GameINI.parseINIValue(at: gameDir, section: "game", key: "title")) ?? "mkxp-z"
         return (org, app)
     }
 

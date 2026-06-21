@@ -359,10 +359,12 @@ enum GameImportValidator {
         //   1. RGSS archive marker (`.rgssad`/`.rgss2a`/`.rgss3a`)
         //      at any candidate game root - its name alone is
         //      sufficient.
-        //   2. Both a candidate-root `.ini` AND a `Data/Scripts.*`
-        //      below that same root. Between them the folder
-        //      validator has everything it needs - no point walking
-        //      the rest of a 700MB archive just to hit EOF.
+        //   2. Both `Game.ini` AND a `Data/Scripts.*` below that
+        //      same root. Only the canonical RPG Maker config file
+        //      counts toward the stop predicate - Windows metadata
+        //      like `desktop.ini` or tool configs like `Editor.ini`
+        //      must not short-circuit the walk before `Game.ini`
+        //      is reached (Perseida ships both).
         //
         // `mkxp.json` still gets extracted for mkxp-only games, but
         // it is NOT enough to short-circuit: many XP games ship an
@@ -385,8 +387,14 @@ enum GameImportValidator {
                 include: { path in
                     guard let entry = ArchiveEntryDescriptor(path) else { return false }
 
-                    // Candidate game-root metadata files.
-                    if entry.isIni, matchesPreferredRoot(entry.parentPath, preferredRoot: preferredRoot) {
+                    // Canonical RPG Maker config only. Other `.ini`
+                    // files at the game root (desktop.ini, Editor.ini,
+                    // MapMaker.ini, …) are ignored here so the walk
+                    // does not stop before `Game.ini` is extracted.
+                    if entry.isIni,
+                        entry.lowercaseName == "game.ini",
+                        matchesPreferredRoot(entry.parentPath, preferredRoot: preferredRoot)
+                    {
                         iniRoots.insert(entry.parentPath)
                         return true
                     }
@@ -579,7 +587,9 @@ enum GameImportValidator {
             }
 
             let relativePath = relativePath(from: directoryURL, to: root)
-            let title = GameEntry.parseINITitle(at: root) ?? root.lastPathComponent
+            let title =
+                GameINI.parseINIValue(at: root, section: "game", key: "title")
+                ?? root.lastPathComponent
             let subtitle = relativePath.isEmpty ? fallbackRootName : relativePath
             choices.append(
                 ImportRootChoice(
@@ -802,7 +812,7 @@ enum GameImportValidator {
 
     /// Returns the detected RGSS version and the raw scripts path.
     private static func parseIniScripts(_ iniURL: URL) -> (RGSSVersion, String)? {
-        guard let value = GameEntry.parseINIValue(in: iniURL, section: "game", key: "scripts") else {
+        guard let value = GameINI.parseINIValue(in: iniURL, section: "game", key: "scripts") else {
             return nil
         }
         let lower = value.lowercased()

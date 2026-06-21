@@ -333,7 +333,7 @@ struct GameMetadata: Codable {
 
         // Signal 2: Game.ini Scripts= extension
         let iniURL = gameDirectory.appendingPathComponent("Game.ini")
-        if let scripts = GameEntry.parseINIValue(in: iniURL, section: "game", key: "scripts") {
+        if let scripts = GameINI.parseINIValue(in: iniURL, section: "game", key: "scripts") {
             let lower = scripts.lowercased()
             if lower.hasSuffix(".rvdata2") { return 3 }
             if lower.hasSuffix(".rvdata") { return 2 }
