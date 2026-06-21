@@ -307,6 +307,7 @@ targets:
       # with Ruby symbols hidden via the unexport list. The merged
       # .o files are linked below in OTHER_LDFLAGS.
       - path: ../../mkxp-z-apple-mobile/src/app_bridge.cpp
+      - path: ../../mkxp-z-apple-mobile/src/ios_fatal_report.mm
       - path: ../../mkxp-z-apple-mobile/src/angle_native_layer.mm
       - path: src
         type: group

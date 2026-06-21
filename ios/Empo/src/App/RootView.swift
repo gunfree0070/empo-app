@@ -87,27 +87,11 @@ struct RootView: View {
             isPresented: showErrorAlert
         ) {
             Button("OK") {
+                dismissErrorAlert()
                 if engineHung {
-                    // RGSS thread is still running inside a script that
-                    // never yielded to checkShutdown(). The Ruby VM
-                    // cannot be respawned in-place, but per App Store
-                    // guideline 2.5.1 we don't quit programmatically.
-                    // Dismiss the alert; the user closes Empo from the
-                    // app switcher and reopens it.
-                    appState.errorMessage = nil
                     return
                 }
                 if appState.phase != nil {
-                    // A game is running and an error surfaced.
-                    // Previously called returnToLibrary() which would
-                    // trigger cross-session Ruby state cleanup; that
-                    // path is no longer trusted (see
-                    // MRUBY_POSTMORTEM.md). Dismiss the alert; the
-                    // engine state may be partially corrupt, so the
-                    // message asks the user to close Empo from the
-                    // app switcher (same iOS-sanctioned escape we use
-                    // for engineHung).
-                    appState.errorMessage = nil
                     return
                 }
                 appState.dismissCrashRecovery()
@@ -166,8 +150,14 @@ struct RootView: View {
     private var showErrorAlert: Binding<Bool> {
         Binding(
             get: { appState.errorMessage != nil },
-            set: { if !$0 { appState.errorMessage = nil } }
+            set: { if !$0 { dismissErrorAlert() } }
         )
+    }
+
+    /// Unblocks any engine thread waiting in `mkxp_presentErrorAndWait()`.
+    private func dismissErrorAlert() {
+        mkxp_signalErrorDismissed()
+        appState.errorMessage = nil
     }
 
     /// True when the RGSS thread didn't ack a termination request in
