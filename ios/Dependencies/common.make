@@ -336,8 +336,10 @@ $(SOURCES)/openal-soft/$(CMAKE_BUILDDIR)/Makefile: $(SOURCES)/openal-soft/CMakeL
 OPENSSL_VERSION := 1.1.1w
 OPENSSL_DIR := $(DOWNLOADS)/openssl-$(OPENSSL_VERSION)
 OPENSSL_CONFIGURE_TARGET := ios64-xcrun
+OPENSSL_CONFIGURE_FLAGS := -miphoneos-version-min=$(MINIMUM_REQUIRED)
 ifeq ($(SDK),iphonesimulator)
 OPENSSL_CONFIGURE_TARGET := iossimulator-xcrun
+OPENSSL_CONFIGURE_FLAGS := -mios-simulator-version-min=$(MINIMUM_REQUIRED)
 endif
 OPENSSL_CONFIGURED := $(OPENSSL_DIR)/.configured-$(SDK)-$(ARCH)
 
@@ -357,7 +359,7 @@ $(OPENSSL_CONFIGURED): $(OPENSSL_DIR)/Configure
 	./Configure $(OPENSSL_CONFIGURE_TARGET) no-shared no-dso \
 		--prefix="$(BUILD_PREFIX)" \
 		--openssldir="$(BUILD_PREFIX)/ssl" \
-		$(TARGET_FLAG)
+		$(OPENSSL_CONFIGURE_FLAGS)
 	touch $@
 
 $(OPENSSL_DIR)/Configure: $(DOWNLOADS)/openssl-$(OPENSSL_VERSION).tar.gz

@@ -1,10 +1,3 @@
-# Pinned native iOS dependency trees (OpenSSL, SDL, Ruby, mkxp-merged, …).
-# Hydrated at build time by tools/fetch-native-deps.sh from empo-deps
-# release assets. Bump NATIVE_DEPS_VERSION when publishing a new tarball
-# via tools/package-native-deps.sh + CI.
-#
-# While unpublished, leave NATIVE_DEPS_VERSION=unpublished and build both
-# trees locally (scripts/rebuild-all-native-deps.sh). Fetch skips download
-# when the on-disk trees already pass verification.
-NATIVE_DEPS_VERSION=unpublished
-NATIVE_DEPS_SHA256=
+# Auto-updated by tools/package-native-deps.sh — commit with the release.
+NATIVE_DEPS_VERSION=native-2026-06-22
+NATIVE_DEPS_SHA256=91ccd4f126f364acee24933ae2cfc951cc63b22bdaf93c824eaad21951438687
