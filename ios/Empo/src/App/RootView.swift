@@ -136,6 +136,10 @@ struct RootView: View {
                     appState.clearCrashMarkerForBackground()
                 }
             }
+            // Persist play time when the app backgrounds so a force-kill
+            // from the switcher doesn't lose the session. No-op when the
+            // timer was already flushed (e.g. user paused to the library).
+            appState.flushSessionPlayTimeForBackground()
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) {
             _ in
@@ -144,6 +148,7 @@ struct RootView: View {
                 // Re-create the crash marker so a crash after resume is
                 // still detected on the next launch.
                 appState.restoreCrashMarkerForForeground()
+                appState.resumeSessionTimingAfterBackground()
             }
         }
         .onChange(of: appState.errorMessage) { _, message in

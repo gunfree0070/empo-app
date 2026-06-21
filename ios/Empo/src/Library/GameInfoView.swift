@@ -299,6 +299,11 @@ struct GameInfoView: View {
                 onImageSelected: { saveBanner($0) },
                 onRemove: { removeBanner() }
             )
+            .onAppear {
+                if let container {
+                    metadata = GameMetadata.load(from: container)
+                }
+            }
             .task {
                 if let container {
                     // Disk size of the entire container (Game/ +

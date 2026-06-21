@@ -53,6 +53,9 @@ class AppState {
 
     private init() {
         SaveMigration.migrateAllDiscoveredGamesIfNeeded()
+        sessionLogger.onPlayTimeFlushed = { gameID in
+            GameLibrary.shared.refreshGameEntry(id: gameID)
+        }
         registerBridgeCallbacks()
     }
 
@@ -224,8 +227,17 @@ class AppState {
         }
     }
 
+    private var activeSessionGame: GameEntry? {
+        selectedGame ?? PauseManager.shared.pausedGame
+    }
+
     private func recordSessionPlayTime() {
-        sessionLogger.recordSessionPlayTime(for: selectedGame)
+        sessionLogger.recordSessionPlayTime(for: activeSessionGame)
+    }
+
+    private func resumeSessionTiming() {
+        guard let game = activeSessionGame else { return }
+        sessionLogger.resumeSessionTiming(for: game)
     }
 
     private static let crashMessage =
@@ -309,6 +321,10 @@ class AppState {
         // Pause graduated from experimental in May 2026; always
         // enabled. Only gate is "a game is playing."
         guard phase == .playing else { return }
+        // Pause is the primary return-to-library path (in-game Quit
+        // is disabled). Flush play time here so last-played and
+        // totals update even though the engine keeps running.
+        recordSessionPlayTime()
         EngineState.shared.isBackgroundPause = false
         mkxp_requestPause()
     }
@@ -341,6 +357,7 @@ class AppState {
         pm.pausedGame = nil
         pm.snapshotCanFade = false
         mkxp_requestResume()
+        resumeSessionTiming()
 
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(350))
@@ -366,6 +383,20 @@ class AppState {
     func restoreCrashMarkerForForeground() {
         guard let container = selectedGame?.container else { return }
         crashTracker.writeMarker(for: container)
+    }
+
+    /// Called from `UIApplication.didEnterBackgroundNotification`.
+    /// Flushes wall-clock play time for any live session (in-game
+    /// or paused-to-library) so metadata survives a force-quit.
+    func flushSessionPlayTimeForBackground() {
+        guard activeSessionGame != nil else { return }
+        recordSessionPlayTime()
+    }
+
+    /// Restarts the session timer after returning from background
+    /// while the game is still in the `.playing` phase.
+    func resumeSessionTimingAfterBackground() {
+        resumeSessionTiming()
     }
 
     private func registerBridgeCallbacks() {
