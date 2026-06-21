@@ -29,7 +29,11 @@ require_file_min() {
 
 has_platform() {
     local path="$1" platform="$2"
-    otool -l "$path" 2>/dev/null | grep -Em1 "platform ${platform}" >/dev/null
+    local out
+    # Slurp otool output: early-exit grep pipelines SIGPIPE otool under
+    # set -o pipefail and make has_platform falsely return failure.
+    out=$(otool -l "$path" 2>/dev/null) || return 1
+    grep -Eq "platform ${platform}([[:space:]]|$)" <<<"$out"
 }
 
 require_platform() {

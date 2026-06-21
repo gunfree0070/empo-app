@@ -71,7 +71,9 @@ file "$BIN" | grep -Eq "Mach-O 64-bit executable arm64" ||
 
 has_platform() {
     local path="$1" platform="$2"
-    otool -l "$path" 2>/dev/null | grep -Em1 "platform ${platform}" >/dev/null
+    local out
+    out=$(otool -l "$path" 2>/dev/null) || return 1
+    grep -Eq "platform ${platform}([[:space:]]|$)" <<<"$out"
 }
 
 if ! has_platform "$BIN" 2; then
