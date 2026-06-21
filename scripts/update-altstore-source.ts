@@ -82,18 +82,7 @@ function requireFlag(name: string, value: string | undefined): string {
 
 const version = requireFlag("version", values.version);
 const remove = values.remove ?? false;
-const build = remove ? undefined : requireFlag("build", values.build);
-const dateString = remove ? undefined : requireFlag("date", values.date);
-const downloadUrl = remove ? undefined : requireFlag("download-url", values["download-url"]);
-const sizeString = remove ? undefined : requireFlag("size", values.size);
-const description = remove ? undefined : values.description;
 const sourcePath = values.source ?? defaultSourcePath;
-
-const sizeBytes = remove ? undefined : Number(sizeString);
-if (!remove && (!Number.isFinite(sizeBytes) || sizeBytes <= 0)) {
-  console.error(`error: --size must be a positive integer (got ${sizeString})`);
-  process.exit(1);
-}
 
 const manifest = (await Bun.file(sourcePath).json()) as Manifest;
 
@@ -115,6 +104,18 @@ if (remove) {
   await Bun.write(sourcePath, JSON.stringify(manifest, null, 2) + "\n");
   console.log(`[altstore-source] removed v${version} -> ${sourcePath}`);
   process.exit(0);
+}
+
+const build = requireFlag("build", values.build);
+const dateString = requireFlag("date", values.date);
+const downloadUrl = requireFlag("download-url", values["download-url"]);
+const sizeString = requireFlag("size", values.size);
+const description = values.description;
+
+const sizeBytes = Number(sizeString);
+if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
+  console.error(`error: --size must be a positive integer (got ${sizeString})`);
+  process.exit(1);
 }
 
 // Reuse the previous entry's minOSVersion so the floor stays aligned
