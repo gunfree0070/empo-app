@@ -5,9 +5,21 @@
 #import "util/exception.h"
 
 #define PATHTONS(str) [NSFileManager.defaultManager stringWithFileSystemRepresentation:str length:strlen(str)]
-#define NSTOPATH(str) [NSFileManager.defaultManager fileSystemRepresentationWithPath:str]
+
+static std::string stdStringFromNSStringPath(NSString *path) {
+    if (path == nil || path.length == 0)
+        return std::string();
+    const char *fsRep = [NSFileManager.defaultManager fileSystemRepresentationWithPath:path];
+    if (fsRep == nullptr)
+        return std::string();
+    return std::string(fsRep);
+}
+
+#define NSTOPATH(str) stdStringFromNSStringPath(str)
 
 bool filesystemImpl::fileExists(const char *path) {
+    if (path == nullptr || path[0] == '\0')
+        return false;
     @autoreleasepool {
         BOOL isDir;
         return [NSFileManager.defaultManager fileExistsAtPath:PATHTONS(path) isDirectory:&isDir] && !isDir;
@@ -56,34 +68,12 @@ std::string filesystemImpl::normalizePath(const char *path, bool preferred, bool
         // while `PHYSFS_enumerateFiles("Data")` (which the engine
         // calls directly, bypassing normalize) sees the file.
         //
-        // Keep relative inputs relative. Only the real absolute-path
-        // codepath needs the NSURL roundtrip (used by e.g. bitmap
-        // save, pref-dir canonicalisation).
+        // Relative paths are collapsed in portable C++ (`collapseRelativePath`)
+        // before this function is reached. Direct callers that still pass a
+        // relative path get the same treatment here.
         NSString *input = PATHTONS(path);
         if (!absolute && ![input hasPrefix:@"/"]) {
-            // Collapse `../` and `./` segments manually. Neither
-            // `stringByStandardizingPath` nor `NSURL` is usable on a
-            // relative string (they resolve against $HOME or cwd and
-            // would re-introduce the absolute-path bug described
-            // above). Walk components and drop any `..` that can
-            // cancel the previous segment; leading `..` stay as-is
-            // since they refer to directories above the game root.
-            NSString *normalized = [input stringByReplacingOccurrencesOfString:@"\\" withString:@"/"];
-            NSArray<NSString *> *parts = [normalized componentsSeparatedByString:@"/"];
-            NSMutableArray<NSString *> *stack = [NSMutableArray array];
-            for (NSString *part in parts) {
-                if ([part isEqualToString:@"."] || [part length] == 0)
-                    continue;
-                if ([part isEqualToString:@".."]) {
-                    if (stack.count > 0 && ![stack.lastObject isEqualToString:@".."]) {
-                        [stack removeLastObject];
-                        continue;
-                    }
-                }
-                [stack addObject:part];
-            }
-            NSString *joined = [stack componentsJoinedByString:@"/"];
-            return std::string(NSTOPATH(joined));
+            return filesystemImpl::collapseRelativePath(path);
         }
 
         NSString *nspath = [NSURL fileURLWithPath:input].URLByStandardizingPath.path;
@@ -92,7 +82,7 @@ std::string filesystemImpl::normalizePath(const char *path, bool preferred, bool
             nspath = [nspath stringByReplacingOccurrencesOfString:pwd withString:@""];
         }
         nspath = [nspath stringByReplacingOccurrencesOfString:@"\\" withString:@"/"];
-        return std::string(NSTOPATH(nspath));
+        return stdStringFromNSStringPath(nspath);
     }
 }
 
