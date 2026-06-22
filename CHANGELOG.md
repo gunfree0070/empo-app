@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.2.6 - 2026-06-22
+
+### Bug Fixes
+
+- Point 0.2.2–0.2.4 downloads at reissued release tags ([`b84e79c`](https://github.com/mateo-m/empo-app/commit/b84e79c367d2e577ee73072dd6065a6035b18c48))
+- Fix `totalPlayTime` and `lastPlayed` values not being modified ([`1598bd5`](https://github.com/mateo-m/empo-app/commit/1598bd5af0a26f19a9f90455994c3284f95bb140))
+- Fix Bun types ([`dd9c264`](https://github.com/mateo-m/empo-app/commit/dd9c264476daaf026d35521c735055334b6b565f))
+- Fix type errors ([`de61b34`](https://github.com/mateo-m/empo-app/commit/de61b34694efd7c0ce46950e590db4a450663c25))
+- Repair has_platform under pipefail ([`dde2777`](https://github.com/mateo-m/empo-app/commit/dde2777846dbbcd189d2eaa5eb69dbc67d78159c))
+- Collapse relative paths in normalize on ios ([`1b9f918`](https://github.com/mateo-m/empo-app/commit/1b9f918ec95af2cae2a30fbb809d81d0f27773f9))
+- Ignore desktop.ini in RPG Maker import preflight ([`f2e6cde`](https://github.com/mateo-m/empo-app/commit/f2e6cde87d7c8346c6d004463059b919aa853493))
+- Unblock engine error dialog and guard Foundation paths ([`52982ff`](https://github.com/mateo-m/empo-app/commit/52982ff669e74563690a13fdf96207f85b1ec2d3))
+- Restore Ruby 1.8 prelude in native dep builds ([`7486578`](https://github.com/mateo-m/empo-app/commit/74865780b752e00dff851df87c3181480c16a7b9))
+
+### Chores
+
+- Update Discord invite link ([`ac1115d`](https://github.com/mateo-m/empo-app/commit/ac1115df22676eb43bfcb36da5d6e07f11aaec76))
+- Cleanup releases ([`975f92a`](https://github.com/mateo-m/empo-app/commit/975f92a0762e2bdde659368cf02e30f8cdfe3ebd))
+- Cleanup unused lockfile ([`eac0190`](https://github.com/mateo-m/empo-app/commit/eac0190605d4e553af3e4bef9ac5d894274b9526))
+- Pin native deps to native-2026-06-22 ([`d9fede8`](https://github.com/mateo-m/empo-app/commit/d9fede881c4057e5407f6918fd502dbbedda36cf))
+
+### Refactor
+
+- Architecture overhaul (#74) ([`7812669`](https://github.com/mateo-m/empo-app/commit/7812669467e133e116e1f529aaedf9eef2854f5e))
+
 ## 0.2.5 - 2026-06-09
 
 ### Bug Fixes
