@@ -1002,8 +1002,8 @@ $(SOURCES)/ruby18/.configured-$(SDK_TAG): $(SOURCES)/ruby18/configure
 		--disable-shared \
 		--enable-static \
 		--with-static-linked-ext; \
-	sed -i '' 's|^MINIRUBY = ruby |MINIRUBY = ruby --disable=gems |' $(SOURCES)/ruby18/Makefile; \
-	touch prelude.c
+		sed -i '' 's|^MINIRUBY = ruby |MINIRUBY = ruby --disable=gems |' $(SOURCES)/ruby18/Makefile; \
+	cp $(PATCHES)/ruby18/prelude.c $(SOURCES)/ruby18/prelude.c
 	@# Override config.h's RUBY_SETJMP / RUBY_LONGJMP to point at
 	@# our PAC-free arm64 setjmp variant (see mkxp_setjmp_arm64.S).
 	@# Configure picks `_setjmp` based on HAVE__SETJMP detection;
