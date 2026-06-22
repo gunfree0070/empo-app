@@ -101,12 +101,12 @@ if [[ -n "$EXPECTED_VERSION" && "$VERSION" != "$EXPECTED_VERSION" ]]; then
 fi
 
 HEAD_COMMIT=$(git -C "$REPO_ROOT" rev-parse --short HEAD)
-EMBEDDED_COMMIT=$(strings "$BIN" | grep -Em1 '^commit: [0-9a-f]+$' | awk '{print $2}')
+EMBEDDED_COMMIT=$(grep -m1 -E '^commit: [0-9a-f]+$' < <(strings "$BIN") | awk '{print $2}')
 [[ -n "$EMBEDDED_COMMIT" ]] || fail "embedded GitInfo commit not found in binary"
 [[ "$EMBEDDED_COMMIT" == "$HEAD_COMMIT" ]] ||
     fail "embedded commit $EMBEDDED_COMMIT != HEAD $HEAD_COMMIT"
 
-if strings "$BIN" | grep -Eq ' \(dirty\)'; then
+if grep -Eq ' \(dirty\)' < <(strings "$BIN"); then
     fail "binary embeds dirty GitInfo marker"
 fi
 
