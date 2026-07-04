@@ -11,7 +11,7 @@ final class EmpoSceneDelegate: UIResponder, UIWindowSceneDelegate {
         willConnectTo session: UISceneSession,
         options connectionOptions: UIScene.ConnectionOptions
     ) {
-        guard scene is UIWindowScene else { return }
-        AppWindow.install()
+        guard let windowScene = scene as? UIWindowScene else { return }
+        AppWindow.install(in: windowScene)
     }
 }

@@ -115,6 +115,22 @@ class AppWindow: UIWindow {
     /// During crash recovery, accepts any connected scene so the
     /// alert can appear without user interaction.
     @objc static func install() {
+        install(in: nil)
+    }
+
+    /// Installs the SwiftUI overlay window. Pass the scene from
+    /// `scene(_:willConnectTo:)` when available so we don't wait for
+    /// `foregroundActive` before the library shell can appear.
+    @objc static func install(in preferredScene: UIWindowScene?) {
+        if instance != nil {
+            return
+        }
+
+        if let preferredScene {
+            createWindow(in: preferredScene)
+            return
+        }
+
         let recovering = AppState.shared.pendingCrashRecovery
 
         for scene in UIApplication.shared.connectedScenes {
