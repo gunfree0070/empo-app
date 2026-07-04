@@ -221,7 +221,13 @@ $(LIBDIR)/libSDL2.a: $(SOURCES)/sdl2/$(CMAKE_BUILDDIR)/Makefile
 	cd $(SOURCES)/sdl2/$(CMAKE_BUILDDIR); \
 	make -j$(NPROC); make install
 
-$(SOURCES)/sdl2/$(CMAKE_BUILDDIR)/Makefile: $(SOURCES)/sdl2/CMakeLists.txt
+$(SOURCES)/sdl2/.patched-$(SDK_TAG): $(PATCHES)/sdl2.patches.lst $(PATCHES)/sdl2/empo-ios.patch
+	cd $(SOURCES)/sdl2; \
+	git checkout -- . 2>/dev/null; \
+	$(PATCHES)/apply-sdl-patches.sh $(SOURCES)/sdl2 --patches-root $(PATCHES); \
+	touch $@
+
+$(SOURCES)/sdl2/$(CMAKE_BUILDDIR)/Makefile: $(SOURCES)/sdl2/CMakeLists.txt $(SOURCES)/sdl2/.patched-$(SDK_TAG)
 	cd $(SOURCES)/sdl2; \
 	mkdir -p $(CMAKE_BUILDDIR); cd $(CMAKE_BUILDDIR); \
 	$(CMAKE) -DBUILD_SHARED_LIBS=no \

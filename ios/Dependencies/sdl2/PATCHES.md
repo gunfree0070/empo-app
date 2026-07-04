@@ -6,7 +6,7 @@
 - **Fork**: <https://github.com/mkxp-z/SDL> branch `mkxp-z-2.28.1`
 - **Base commit**: `4761467b2` ("Updated to version 2.28.1 for release")
 
-## Patches
+## Patches in mkxp-z/SDL (submodule)
 
 Three custom commits on top of upstream SDL 2.28.1:
 
@@ -16,6 +16,28 @@ Three custom commits on top of upstream SDL 2.28.1:
 
 The NEON patches prevent build/runtime issues on ARM platforms where the
 NEON intrinsics cause problems with the cross-compilation toolchain.
+
+## Empo-local patches (applied at build time)
+
+Empo keeps the SDL submodule pinned to the published `mkxp-z-2.28.1`
+tip and applies additional iOS fixes from `ios/Dependencies/sdl2/` via
+`sdl2.patches.lst` + `apply-sdl-patches.sh` (same model as Ruby).
+
+**`empo-ios.patch`** — iOS runtime fixes on top of the fork tip:
+
+- Defer renderbuffer resize to the GL-owning thread (rotation crash)
+- Synchronous present to prevent SIGSEGV during rapid rotation
+- Detect broken GL context and bail out gracefully
+- Create UIKit windows from the active `UIWindowScene` (required after
+  adopting UIScene lifecycle on iOS 27 SDK; legacy `initWithFrame:`
+  windows are not displayed)
+
+Regenerate after editing the SDL submodule:
+
+```sh
+cd ios/Dependencies/sources/sdl2
+git diff origin/mkxp-z-2.28.1..HEAD > ../sdl2/empo-ios.patch
+```
 
 ## iOS build instructions
 
