@@ -1,5 +1,4 @@
 #import <UIKit/UIKit.h>
-#import "Empo-Swift.h"
 #import "AudioSession.h"
 
 __attribute__((constructor)) static void appLoaderInit(void) {
@@ -10,6 +9,4 @@ __attribute__((constructor)) static void appLoaderInit(void) {
     // call audio would default to `SoloAmbient`: silenced on
     // device lock and on phone-mute. See AudioSession.m.
     mkxp_configureAudioSession();
-
-    dispatch_async(dispatch_get_main_queue(), ^{ [AppWindow install]; });
 }

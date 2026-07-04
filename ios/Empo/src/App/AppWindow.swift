@@ -109,7 +109,8 @@ class AppWindow: UIWindow {
         }
     }
 
-    /// Called once at app startup (from AppLoader.m via +load).
+    /// Called once at app startup from `EmpoSceneDelegate` when UIKit
+    /// connects the primary `UIWindowScene`.
     /// Checks for an active scene first, otherwise waits for one.
     /// During crash recovery, accepts any connected scene so the
     /// alert can appear without user interaction.
