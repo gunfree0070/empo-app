@@ -32,6 +32,7 @@ ios/Dependencies/Frameworks/
 
 # Xcode / DerivedData
 DerivedData/
+ios/Empo/.derivedData/
 *.xcworkspace
 xcuserdata/
 
