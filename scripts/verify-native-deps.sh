@@ -81,4 +81,30 @@ for name in libruby.3.1-static.a libruby.3.1-ext.a libruby18-static.a libruby18-
     require_platform "$path" "$EXPECTED_PLATFORM" "$name"
 done
 
+# Staleness guard: binding/*.cpp + hmode7 + engine headers compile into
+# the prebuilt mkxp*-merged.o files, NOT into the Xcode build (see the
+# note above OTHER_LDFLAGS in ios/Empo/project.yml). Editing those
+# sources without re-running `make mkxp-merged` silently links stale
+# engine code. common.make stamps a content hash of that source set
+# next to the merged objects; recompute and compare here so the Xcode
+# build fails loudly instead. Content-based (not mtime) so prebuilt
+# tarballs still verify on fresh clones.
+FINGERPRINT_FILE="$LIB/.mkxp-binding-fingerprint"
+FINGERPRINT_SCRIPT="$REPO_ROOT/ios/Dependencies/tools/binding-fingerprint.sh"
+if [[ -f "$FINGERPRINT_FILE" ]]; then
+    recorded="$(cat "$FINGERPRINT_FILE")"
+    current="$("$FINGERPRINT_SCRIPT")"
+    if [[ "$current" != "$recorded" ]]; then
+        fail "mkxp merged objects are STALE for $PLATFORM: binding/hmode7/engine-header \
+sources changed since mkxp*-merged.o was built. Rebuild with: \
+cd ios/Dependencies && make -f ${PLATFORM}.make mkxp-merged"
+    fi
+else
+    # Trees built before the fingerprint existed (or old prebuilt
+    # tarballs) lack the stamp. Warn instead of failing so they keep
+    # building; the stamp appears on the next mkxp-merged rebuild.
+    echo "warning: $FINGERPRINT_FILE missing; cannot check mkxp*-merged.o staleness" >&2
+    echo "warning: rebuild once to enable the guard: cd ios/Dependencies && make -f ${PLATFORM}.make mkxp-merged" >&2
+fi
+
 echo "OK: $PLATFORM native dependency artifacts look healthy"

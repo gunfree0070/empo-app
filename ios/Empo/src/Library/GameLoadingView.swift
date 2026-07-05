@@ -118,6 +118,7 @@ struct GameLoadingView: View {
             withAnimation(.spring(duration: duration, bounce: 0)) {
                 appState.phase = .playing
             }
+            AppWindow.resignKeyToSDL()
         }
     }
 

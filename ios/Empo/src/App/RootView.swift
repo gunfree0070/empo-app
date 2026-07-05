@@ -41,8 +41,8 @@ struct RootView: View {
                 PlayerView(appState: appState, engineState: engineState, layout: layout)
                     .transition(.identity)
                     .zIndex(1)
-                    // Don't intercept taps meant for the error alert.
-                    .allowsHitTesting(appState.errorMessage == nil)
+                    // Don't intercept taps meant for the error/info alerts.
+                    .allowsHitTesting(appState.errorMessage == nil && appState.infoMessage == nil)
             }
         }
         .fontDesign(.rounded)
@@ -107,6 +107,16 @@ struct RootView: View {
                 Text(appState.errorMessage ?? "")
             }
         }
+        .alert(
+            infoAlertTitle,
+            isPresented: showInfoAlert
+        ) {
+            Button("OK") {
+                dismissInfoAlert()
+            }
+        } message: {
+            Text(appState.infoMessage ?? "")
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) {
             _ in
             if appState.phase == .playing {
@@ -141,7 +151,16 @@ struct RootView: View {
             // for the error dialog; release when dismissed.
             if message != nil {
                 AppWindow.setAllowKeyWindow(true)
-            } else if appState.phase == .playing {
+            } else if appState.phase == .playing, appState.infoMessage == nil {
+                AppWindow.setAllowKeyWindow(false)
+            }
+        }
+        .onChange(of: appState.infoMessage) { _, message in
+            // Same key-window dance as errors: the info alert needs
+            // touches while presenting; SDL gets them back after.
+            if message != nil {
+                AppWindow.setAllowKeyWindow(true)
+            } else if appState.phase == .playing, appState.errorMessage == nil {
                 AppWindow.setAllowKeyWindow(false)
             }
         }
@@ -158,6 +177,28 @@ struct RootView: View {
     private func dismissErrorAlert() {
         mkxp_signalErrorDismissed()
         appState.errorMessage = nil
+    }
+
+    private var showInfoAlert: Binding<Bool> {
+        Binding(
+            get: { appState.infoMessage != nil },
+            set: { if !$0 { dismissInfoAlert() } }
+        )
+    }
+
+    /// The game speaks in its own name: title the alert after the
+    /// running game so the notice doesn't read as an Empo message.
+    private var infoAlertTitle: String {
+        appState.selectedGame?.title
+            ?? PauseManager.shared.pausedGame?.title
+            ?? "Message"
+    }
+
+    /// Unblocks the engine thread waiting in `mkxp_presentInfoAndWait()`;
+    /// the game resumes right where it called `msgbox`.
+    private func dismissInfoAlert() {
+        mkxp_signalInfoDismissed()
+        appState.infoMessage = nil
     }
 
     /// True when the RGSS thread didn't ack a termination request in

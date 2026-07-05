@@ -14,6 +14,11 @@ class AppState {
     var phase: GamePhase?
     var selectedGame: GameEntry?
     var errorMessage: String?
+    /// Deliberate in-game dialog (Ruby `msgbox` / `p`), not an error.
+    /// The engine thread is blocked in `mkxp_presentInfoAndWait()`
+    /// until RootView's info alert is dismissed; the game then
+    /// continues running, so no restart framing is shown.
+    var infoMessage: String?
     var engineReady = false
     /// Set when an error alert fires during a `.loading` session
     /// and stays true until the next `selectGame`. The loading
@@ -213,6 +218,7 @@ class AppState {
             try? await Task.sleep(for: .milliseconds(350))
             guard let self, pm.pausedGame == nil else { return }
             self.phase = .playing
+            AppWindow.resignKeyToSDL()
             // The frame-rendered callback in EngineSessionCoordinator
             // also flips `snapshotCanFade` once the engine has drawn
             // a real frame; this timed fallback just guarantees the
@@ -300,6 +306,10 @@ extension AppState: EngineSessionCoordinatorDelegate {
 
     func coordinatorDidReportEngineError(_ message: String) {
         errorMessage = message
+    }
+
+    func coordinatorDidReportEngineInfo(_ message: String) {
+        infoMessage = message
     }
 
     func coordinatorEngineDidPause(snapshot: UIImage?) {

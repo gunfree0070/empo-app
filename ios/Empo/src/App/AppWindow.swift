@@ -90,6 +90,7 @@ class AppWindow: UIWindow {
     override var canBecomeKey: Bool {
         let state = AppState.shared
         if state.errorMessage != nil { return true }
+        if state.infoMessage != nil { return true }
         if state.phase != .playing { return true }
         return allowKeyWindow
     }
@@ -106,6 +107,18 @@ class AppWindow: UIWindow {
         window.allowKeyWindow = allow
         if allow {
             window.makeKey()
+        } else {
+            resignKeyToSDL()
+        }
+    }
+
+    /// Returns UIKit key-window status to SDL after the overlay
+    /// relinquishes `canBecomeKey` (e.g. loading -> playing).
+    @objc static func resignKeyToSDL() {
+        guard let overlay = instance, let scene = overlay.windowScene else { return }
+        for window in scene.windows where window !== overlay {
+            window.makeKey()
+            return
         }
     }
 

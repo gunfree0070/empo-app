@@ -147,6 +147,23 @@ PLATFORM_NAME=iphoneos scripts/verify-native-deps.sh
 PLATFORM_NAME=iphonesimulator scripts/verify-native-deps.sh
 ```
 
+### Editing engine binding code
+
+`mkxp-z-apple-mobile/binding/*.cpp` (and `hmode7/`) are **not** compiled by
+Xcode — they're baked into the prebuilt `mkxp{18,19,31}-merged.o` objects.
+After editing them (or any engine header they include), rebuild the merged
+objects for the SDK you're targeting:
+
+```sh
+cd ios/Dependencies
+make -f iphonesimulator.make mkxp-merged   # or iphoneos.make
+```
+
+The merged targets track those sources as prerequisites, so this is a no-op
+when nothing changed. The Xcode build verifies a content fingerprint of the
+same source set on every build (`scripts/verify-native-deps.sh`) and fails
+with a rebuild hint if the merged objects are stale.
+
 ### Simulator install
 
 ```sh

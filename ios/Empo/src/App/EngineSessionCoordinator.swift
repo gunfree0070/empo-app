@@ -15,6 +15,7 @@ protocol EngineSessionCoordinatorDelegate: AnyObject {
     func coordinatorEngineTerminatedUnexpectedly(cleanExit: Bool)
     func coordinatorGameRectDidChange(_ rect: CGRect)
     func coordinatorDidReportEngineError(_ message: String)
+    func coordinatorDidReportEngineInfo(_ message: String)
     func coordinatorEngineDidPause(snapshot: UIImage?)
 }
 
@@ -174,6 +175,17 @@ final class EngineSessionCoordinator {
                 Task { @MainActor in
                     EngineSessionCoordinator.shared.delegate?
                         .coordinatorDidReportEngineError(message)
+                    AppWindow.setAllowKeyWindow(true)
+                }
+            }, nil)
+
+        mkxp_setInfoMessageCallback(
+            { msg, _ in
+                guard let msg else { return }
+                let message = String(cString: msg)
+                Task { @MainActor in
+                    EngineSessionCoordinator.shared.delegate?
+                        .coordinatorDidReportEngineInfo(message)
                     AppWindow.setAllowKeyWindow(true)
                 }
             }, nil)

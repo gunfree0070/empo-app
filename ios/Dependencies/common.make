@@ -511,6 +511,24 @@ mkxp19-merged: init_dirs ruby19   $(LIBDIR)/mkxp19-merged.o
 mkxp18-merged: init_dirs ruby18   $(LIBDIR)/mkxp18-merged.o
 mkxp-merged: mkxp18-merged mkxp19-merged mkxp31-merged
 
+# Every source that compiles into the merged binding objects. Listing
+# them as prerequisites means editing binding-mri.cpp (or any engine
+# header the binding includes) makes `make mkxp-merged` rebuild the
+# .o files instead of silently reusing stale ones. Engine headers are
+# included because the Xcode-compiled engine half shares struct
+# layouts with the binding half; drifting apart is UB, not a link
+# error. tools/binding-fingerprint.sh hashes the same set so
+# scripts/verify-native-deps.sh can fail fast in the Xcode build.
+MKXPZ_BINDING_SRC_DEPS := \
+    $(wildcard $(ENGINE)/binding/*.cpp) \
+    $(wildcard $(ENGINE)/binding/*.h) \
+    $(wildcard $(ENGINE)/hmode7/src/*.cpp) \
+    $(wildcard $(ENGINE)/hmode7/src/*.h) \
+    $(wildcard $(ENGINE)/src/*.h) \
+    $(wildcard $(ENGINE)/src/*/*.h)
+
+MKXPZ_BINDING_FINGERPRINT := ${PWD}/tools/binding-fingerprint.sh
+
 # Ruby 3.1 — patched parser with syntax-transform support. Includes
 # are
 # anchored at the global $(INCLUDEDIR) (3.1's traditional install
@@ -564,7 +582,8 @@ MKXPZ_DEFINES_31 := \
 
 $(LIBDIR)/mkxp31-merged.o: $(LIBDIR)/libruby.3.1-static.a \
                           $(LIBDIR)/libruby.3.1-ext.a \
-                          ${PWD}/multiruby/wrapper.cpp
+                          ${PWD}/multiruby/wrapper.cpp \
+                          $(MKXPZ_BINDING_SRC_DEPS)
 	@echo "[mkxp31] Compiling binding/*.cpp + hmode7/*.cpp against Ruby 3.1..."
 	@mkdir -p $(BINDING_OBJDIR_31)
 	@for src in $(ENGINE)/binding/*.cpp $(ENGINE)/hmode7/src/*.cpp; do \
@@ -618,6 +637,7 @@ $(LIBDIR)/mkxp31-merged.o: $(LIBDIR)/libruby.3.1-static.a \
 	@TGLOBALS=$$(nm $(LIBDIR)/mkxp31-merged.o | awk '$$2 == "T"' | sort -u | wc -l | tr -d ' '); \
 	echo "  global T symbols (should be 1: _mkxp_get_script_binding_31): $$TGLOBALS"
 	@nm $(LIBDIR)/mkxp31-merged.o | awk '$$2 == "T"' | head -3
+	@$(MKXPZ_BINDING_FINGERPRINT) > $(LIBDIR)/.mkxp-binding-fingerprint
 
 # Ruby 1.9 + 1.8 mkxp merged.o targets — same shape as 3.0/3.1 above.
 # RAPI macros in binding-util.h gate the C-API differences; we hand
@@ -706,7 +726,8 @@ MKXPZ_DEFINES_18 := \
 
 $(LIBDIR)/mkxp19-merged.o: $(LIBDIR)/libruby19-static.a \
                           $(LIBDIR)/libruby19-ext.a \
-                          ${PWD}/multiruby/wrapper.cpp
+                          ${PWD}/multiruby/wrapper.cpp \
+                          $(MKXPZ_BINDING_SRC_DEPS)
 	@echo "[mkxp19] Compiling binding/*.cpp + hmode7/*.cpp against Ruby 1.9..."
 	@mkdir -p $(BINDING_OBJDIR_19)
 	@for src in $(ENGINE)/binding/*.cpp $(ENGINE)/hmode7/src/*.cpp; do \
@@ -753,10 +774,12 @@ $(LIBDIR)/mkxp19-merged.o: $(LIBDIR)/libruby19-static.a \
 	@TGLOBALS=$$(nm $(LIBDIR)/mkxp19-merged.o | awk '$$2 == "T"' | sort -u | wc -l | tr -d ' '); \
 	echo "  global T symbols (should be 1: _mkxp_get_script_binding_19): $$TGLOBALS"
 	@nm $(LIBDIR)/mkxp19-merged.o | awk '$$2 == "T"' | head -3
+	@$(MKXPZ_BINDING_FINGERPRINT) > $(LIBDIR)/.mkxp-binding-fingerprint
 
 $(LIBDIR)/mkxp18-merged.o: $(LIBDIR)/libruby18-static.a \
                           $(LIBDIR)/libruby18-ext.a \
-                          ${PWD}/multiruby/wrapper.cpp
+                          ${PWD}/multiruby/wrapper.cpp \
+                          $(MKXPZ_BINDING_SRC_DEPS)
 	@echo "[mkxp18] Compiling binding/*.cpp + hmode7/*.cpp against Ruby 1.8..."
 	@mkdir -p $(BINDING_OBJDIR_18)
 	@for src in $(ENGINE)/binding/*.cpp $(ENGINE)/hmode7/src/*.cpp; do \
@@ -803,6 +826,7 @@ $(LIBDIR)/mkxp18-merged.o: $(LIBDIR)/libruby18-static.a \
 	@TGLOBALS=$$(nm $(LIBDIR)/mkxp18-merged.o | awk '$$2 == "T"' | sort -u | wc -l | tr -d ' '); \
 	echo "  global T symbols (should be 1: _mkxp_get_script_binding_18): $$TGLOBALS"
 	@nm $(LIBDIR)/mkxp18-merged.o | awk '$$2 == "T"' | head -3
+	@$(MKXPZ_BINDING_FINGERPRINT) > $(LIBDIR)/.mkxp-binding-fingerprint
 
 # Ruby 1.8 (submodule: sources/ruby18)
 ruby18: init_dirs $(LIBDIR)/libruby18-static.a $(LIBDIR)/libruby18-ext.a
