@@ -1,3 +1,4 @@
+import GameProbe
 import SwiftUI
 
 private struct EmptyStateHeightKey: PreferenceKey {
@@ -33,6 +34,9 @@ struct GameLibraryView: View {
     @State private var gameForInfo: GameEntry?
     @State private var pendingGame: GameEntry?
     @State private var showPausedGameAlert = false
+    @State private var rtpBlockedGame: GameEntry?
+    @State private var rtpBlockedRequirement: GameRTPRequirement?
+    @State private var showRTPRequiredAlert = false
     @State private var staggerTrigger = UUID()
     @State private var entranceDelay: TimeInterval = 0.15
     @State private var emptyStateHeight: CGFloat = 0
@@ -184,6 +188,9 @@ struct GameLibraryView: View {
                     showInvalidAlert: $showInvalidAlert,
                     showCancelValidationAlert: $showCancelValidationAlert,
                     showPausedGameAlert: $showPausedGameAlert,
+                    showRTPRequiredAlert: $showRTPRequiredAlert,
+                    rtpBlockedGame: rtpBlockedGame,
+                    rtpBlockedRequirement: rtpBlockedRequirement,
                     importPipelineAlert: importPipelineAlertBinding,
                     pausedGame: pauseManager.pausedGame,
                     onDeleteGame: deleteSelectedGame,
@@ -818,6 +825,13 @@ struct GameLibraryView: View {
         } else if pauseManager.pausedGame != nil {
             pendingGame = game
             showPausedGameAlert = true
+        } else if let container = game.container,
+            AppState.blocksRTPDependentLaunch(for: container),
+            let requirement = GameRTPRequirement.detect(at: container.gameURL)
+        {
+            rtpBlockedGame = game
+            rtpBlockedRequirement = requirement
+            showRTPRequiredAlert = true
         } else {
             appState.selectGame(game)
             path.append(game)
@@ -972,6 +986,9 @@ private struct LibraryAlertPresentation: ViewModifier {
     @Binding var showInvalidAlert: Bool
     @Binding var showCancelValidationAlert: Bool
     @Binding var showPausedGameAlert: Bool
+    @Binding var showRTPRequiredAlert: Bool
+    let rtpBlockedGame: GameEntry?
+    let rtpBlockedRequirement: GameRTPRequirement?
     @Binding var importPipelineAlert: ImportPipelineAlert?
     let pausedGame: GameEntry?
     let onDeleteGame: () -> Void
@@ -1008,6 +1025,22 @@ private struct LibraryAlertPresentation: ViewModifier {
                 Button("OK") {}
             } message: {
                 Text("This game couldn't be loaded properly. You can delete it and try importing again.")
+            }
+            .alert("Run-Time Package Required", isPresented: $showRTPRequiredAlert) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                if let game = rtpBlockedGame, let requirement = rtpBlockedRequirement {
+                    Text(
+                        """
+                        "\(game.title)" needs shared RPG Maker assets from \
+                        \(requirement.friendlySummary) (\(requirement.summary)). \
+                        These Run-Time Packages are not bundled with the game.
+
+                        Empo cannot load Run-Time Packages yet, so this game \
+                        cannot be played.
+                        """
+                    )
+                }
             }
             .alert("Cancel import?", isPresented: $showCancelValidationAlert) {
                 Button("Keep importing", role: .cancel) {}

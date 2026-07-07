@@ -1,4 +1,5 @@
 import Foundation
+import GameProbe
 import Observation
 import SwiftUI
 
@@ -67,6 +68,7 @@ class AppState {
 
         guard phase == nil, pauseManager.pausedGame == nil else { return }
         guard let container = game.container else { return }
+        if Self.blocksRTPDependentLaunch(for: container) { return }
         SaveMigration.migrateLegacySavesIfNeeded(for: container)
         selectedGame = game
         sessionHadError = false
@@ -253,6 +255,18 @@ class AppState {
     /// while the game is still in the `.playing` phase.
     func resumeSessionTimingAfterBackground() {
         session.resumeSessionTiming(for: activeSessionGame)
+    }
+}
+
+// MARK: - RTP launch guard
+
+extension AppState {
+    /// True when the game declares RTP in `Game.ini` but Empo has no
+    /// configured RTP paths. `GameLibraryView` shows an alert before
+    /// calling `selectGame`; this is a safety net for any other caller.
+    static func blocksRTPDependentLaunch(for container: GameContainer) -> Bool {
+        guard !RTPAvailability.isConfigured else { return false }
+        return GameRTPRequirement.detect(at: container.gameURL) != nil
     }
 }
 

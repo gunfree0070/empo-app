@@ -18,14 +18,15 @@ public enum GameINI {
     }
 
     /// Reads `[section] key=value` from a Game.ini file. Both
-    /// `section` and `key` are matched case-insensitively.
+    /// `section` and `key` are matched case-insensitively. Optional
+    /// whitespace around `=` is accepted (`title =BLACK SOULS`).
     public static func parseINIValue(in iniURL: URL, section: String, key: String) -> String? {
         guard let value = try? Data(contentsOf: iniURL).decodeAsLooseText() else {
             return nil
         }
 
         let sectionLower = "[\(section.lowercased())]"
-        let keyPrefixLower = "\(key.lowercased())="
+        let keyLower = key.lowercased()
         var inSection = false
         for line in value.components(separatedBy: .newlines) {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
@@ -34,12 +35,12 @@ public enum GameINI {
                 continue
             }
             if inSection {
-                let lowered = trimmed.lowercased()
-                if lowered.hasPrefix(keyPrefixLower) {
-                    let v = String(trimmed.dropFirst(keyPrefixLower.count))
-                        .trimmingCharacters(in: .whitespaces)
-                    if !v.isEmpty { return v }
-                }
+                let parts = trimmed.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
+                guard parts.count == 2 else { continue }
+                let lineKey = parts[0].trimmingCharacters(in: .whitespaces).lowercased()
+                guard lineKey == keyLower else { continue }
+                let v = String(parts[1]).trimmingCharacters(in: .whitespaces)
+                if !v.isEmpty { return v }
             }
         }
         return nil
