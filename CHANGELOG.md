@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.8 - 2026-07-08
+
+### Bug Fixes
+
+- Embed SDL view and restore play controls ([`7303900`](https://github.com/mateo-m/empo-app/commit/7303900642903f01b5793575e599c9a47ab5df89))
+
 ## 0.2.7 - 2026-07-08
 
 ### Bug Fixes
