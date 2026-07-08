@@ -24,11 +24,29 @@ private class AppRootViewController: UIViewController {
         super.viewDidLoad()
 
         addChild(hostingController)
-        hostingController.view.backgroundColor = .clear
-        hostingController.view.frame = view.bounds
-        hostingController.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        view.addSubview(hostingController.view)
+        // UIHostingController defaults to an opaque systemBackground.
+        // Clear + isOpaque=false so the SDL/ANGLE window under AppWindow
+        // can show through during gameplay (PlayerView is mostly clear).
+        let hosted = hostingController.view!
+        hosted.backgroundColor = .clear
+        hosted.isOpaque = false
+        hosted.layer.isOpaque = false
+        hosted.frame = view.bounds
+        hosted.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        view.addSubview(hosted)
         hostingController.didMove(toParent: self)
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        // SwiftUI can reintroduce an opaque hosting background after
+        // hierarchy updates; keep the pass-through contract intact.
+        let hosted = hostingController.view!
+        if hosted.backgroundColor != .clear || hosted.isOpaque {
+            hosted.backgroundColor = .clear
+            hosted.isOpaque = false
+            hosted.layer.isOpaque = false
+        }
     }
 
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
@@ -80,9 +98,33 @@ class AppWindow: UIWindow {
         )
     }
 
-    // No hitTest override needed. Controls handle their own key injection
-    // via the bridge. Background touches are harmlessly absorbed; RGSS games
-    // use keyboard input, not mouse/touch.
+    /// During gameplay, only control/toolbar subviews should absorb
+    /// touches. Empty game-area hits return nil so UIKit can deliver
+    /// them to the SDL window below and SwiftUI skips useless work.
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        let hit = super.hitTest(point, with: event)
+        guard AppState.shared.phase == .playing else { return hit }
+        guard let hit else { return nil }
+
+        var view: UIView? = hit
+        while let current = view {
+            if current is UIControl {
+                return hit
+            }
+            if let recognizers = current.gestureRecognizers, !recognizers.isEmpty {
+                return hit
+            }
+            view = current.superview
+        }
+
+        let typeName = String(describing: type(of: hit))
+        if typeName.contains("Hosting") || hit === rootViewController?.view {
+            return nil
+        }
+        return hit
+    }
+
+    // Controls handle their own key injection via the bridge.
 
     /// In library/loading: this window must be key for SwiftUI.
     /// In player: SDL needs key; unless keyboard mode is active or
@@ -94,6 +136,8 @@ class AppWindow: UIWindow {
         if state.phase != .playing { return true }
         return allowKeyWindow
     }
+
+    static var hostView: UIView? { instance?.rootViewController?.view }
 
     static var currentSafeArea: EdgeInsets {
         guard let window = instance else { return .init() }
@@ -191,6 +235,7 @@ class AppWindow: UIWindow {
 
         observePhase(window: window)
         observeTheme(window: window)
+        applyOverlayPresentationMode(window: window)
     }
 
     private static func observePhase(window: AppWindow) {
@@ -198,9 +243,51 @@ class AppWindow: UIWindow {
             _ = AppState.shared.phase
         } onChange: { [weak window] in
             Task { @MainActor in
-                window?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
-                if let window { observePhase(window: window) }
+                if let window {
+                    applyOverlayPresentationMode(window: window)
+                    window.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+                    observePhase(window: window)
+                }
             }
+        }
+    }
+
+    /// Keep AppWindow visible; reparent SDL's game view here while
+    /// playing so one UIWindow owns the compositing stack.
+    private static func applyOverlayPresentationMode(window: AppWindow) {
+        let playing = AppState.shared.phase == .playing
+
+        if playing {
+            window.isHidden = false
+            window.isOpaque = false
+            window.backgroundColor = .clear
+            window.layer.isOpaque = false
+            if let root = window.rootViewController?.view {
+                clearPassThroughBackdrop(in: root)
+            }
+            GameViewEmbedder.embedWithRetry()
+        } else {
+            GameViewEmbedder.detach()
+            window.isHidden = false
+            window.isOpaque = false
+            window.backgroundColor = .clear
+            window.layer.isOpaque = false
+            if let root = window.rootViewController?.view {
+                clearPassThroughBackdrop(in: root)
+            }
+        }
+    }
+
+    /// Strip opaque UIKit backdrops SwiftUI installs on hosting views.
+    private static func clearPassThroughBackdrop(in view: UIView) {
+        let typeName = String(describing: type(of: view))
+        if typeName.contains("Hosting") {
+            view.backgroundColor = .clear
+            view.isOpaque = false
+            view.layer.isOpaque = false
+        }
+        for subview in view.subviews {
+            clearPassThroughBackdrop(in: subview)
         }
     }
 

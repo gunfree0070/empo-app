@@ -209,6 +209,13 @@ struct GameLibraryView: View {
             .onPreferenceChange(EmptyStateHeightKey.self) { emptyStateHeight = $0 }
             .safeAreaInset(edge: .top, spacing: 0) { headerInset }
             .background { libraryBackground }
+            // Match GameLoadingView: NavigationStack container fills stay
+            // opaque on device under parent opacity(0). Clear them while
+            // the SDL window must show through AppWindow.
+            .containerBackground(
+                appState.phase == .playing ? .clear : Color(.systemBackground),
+                for: .navigation
+            )
             .animation(Motion.standard, value: showEmpty)
             .onChange(of: splashDismissed) { _, dismissed in
                 handleSplashDismissedChange(dismissed)
@@ -250,27 +257,39 @@ struct GameLibraryView: View {
             }
         }
         .background {
-            Rectangle()
-                .fill(Color(.systemBackground))
-                .padding(.bottom, -30)
-                .mask {
-                    VStack(spacing: 0) {
-                        Rectangle()
-                        LinearGradient(
-                            colors: [.black, .clear],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                        .frame(height: 30)
+            if appState.phase != .playing {
+                Rectangle()
+                    .fill(Color(.systemBackground))
+                    .padding(.bottom, -30)
+                    .mask {
+                        VStack(spacing: 0) {
+                            Rectangle()
+                            LinearGradient(
+                                colors: [.black, .clear],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                            .frame(height: 30)
+                        }
                     }
-                }
-                .ignoresSafeArea(edges: .top)
+                    .ignoresSafeArea(edges: .top)
+            }
         }
     }
 
     private var libraryBackground: some View {
-        Color(.systemBackground)
-            .ignoresSafeArea()
+        // Clear while playing so a faded-out library cannot paint an
+        // opaque systemBackground over the SDL game window beneath
+        // AppWindow (device compositing; simulator often still shows
+        // through opacity(0) alone).
+        Group {
+            if appState.phase == .playing {
+                Color.clear
+            } else {
+                Color(.systemBackground)
+            }
+        }
+        .ignoresSafeArea()
     }
 
     private var showsUpdateBanner: Bool {

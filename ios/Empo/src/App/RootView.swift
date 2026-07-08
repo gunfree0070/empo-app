@@ -14,6 +14,10 @@ struct RootView: View {
     @State private var showSplash: Bool
     @State private var splashExiting = false
     @State private var splashDismissed: Bool
+    /// Library stays mounted through the loading→playing fade, then
+    /// unmounts so Ken Burns / NavigationStack stop compositing over
+    /// the embedded game view.
+    @State private var libraryMounted = true
 
     init() {
         let recovering = AppState.shared.pendingCrashRecovery
@@ -27,26 +31,48 @@ struct RootView: View {
 
     var body: some View {
         ZStack {
-            // Always mounted so NavigationStack persists across phases
-            GameLibraryView(heroNamespace: hero, splashDismissed: splashDismissed)
-                .opacity(appState.phase == .playing ? 0 : 1)
-                .allowsHitTesting(appState.phase != .playing)
+            // Explicit transparent base. Without this, SwiftUI can
+            // default the UIHostingController backdrop to
+            // systemBackground, which occludes the SDL window on
+            // device even when every child view is "clear".
+            Color.clear.ignoresSafeArea()
 
-            // Playing; transparent controls overlay.
-            // .transition(.identity) prevents the default fade-in so
-            // PlayerView appears at full opacity instantly, even when
-            // the phase change is wrapped in withAnimation.  This lets
-            // the library fade out smoothly without a cross-fade dim.
+            // Fade the library out on play (loading banner handoff), then
+            // unmount after the spring so Ken Burns / NavigationStack
+            // don't keep running over the embedded game view. Remounts
+            // on pause/return; path is cleared by GameLibraryView.
+            if libraryMounted {
+                GameLibraryView(heroNamespace: hero, splashDismissed: splashDismissed)
+                    .opacity(appState.phase == .playing ? 0 : 1)
+                    .allowsHitTesting(appState.phase != .playing)
+                    .transition(.identity)
+            }
+
+            // Instant appear: library fades out underneath without a
+            // cross-fade dim on the controls.
             if appState.phase == .playing {
                 PlayerView(appState: appState, engineState: engineState, layout: layout)
                     .transition(.identity)
-                    .zIndex(1)
-                    // Don't intercept taps meant for the error/info alerts.
-                    .allowsHitTesting(appState.errorMessage == nil && appState.infoMessage == nil)
+                    .allowsHitTesting(
+                        appState.errorMessage == nil && appState.infoMessage == nil
+                    )
             }
         }
         .fontDesign(.rounded)
         .tint(.brand)
+        .onChange(of: appState.phase) { _, phase in
+            if phase == .playing {
+                // Slightly longer than GameLoadingView's handoff spring
+                // (0.15–0.30s) so the fade finishes before unmount.
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(400))
+                    guard appState.phase == .playing else { return }
+                    libraryMounted = false
+                }
+            } else {
+                libraryMounted = true
+            }
+        }
         .overlay {
             if showSplash {
                 SplashView(
@@ -146,21 +172,20 @@ struct RootView: View {
             }
         }
         .onChange(of: appState.errorMessage) { _, message in
-            // While playing, SDL owns the key window so touches reach
-            // the game view instead of SwiftUI alerts. Steal key status
-            // for the error dialog; release when dismissed.
             if message != nil {
                 AppWindow.setAllowKeyWindow(true)
             } else if appState.phase == .playing, appState.infoMessage == nil {
                 AppWindow.setAllowKeyWindow(false)
+            } else if appState.phase != .playing, appState.infoMessage == nil {
+                AppWindow.setAllowKeyWindow(false)
             }
         }
         .onChange(of: appState.infoMessage) { _, message in
-            // Same key-window dance as errors: the info alert needs
-            // touches while presenting; SDL gets them back after.
             if message != nil {
                 AppWindow.setAllowKeyWindow(true)
             } else if appState.phase == .playing, appState.errorMessage == nil {
+                AppWindow.setAllowKeyWindow(false)
+            } else if appState.phase != .playing, appState.errorMessage == nil {
                 AppWindow.setAllowKeyWindow(false)
             }
         }

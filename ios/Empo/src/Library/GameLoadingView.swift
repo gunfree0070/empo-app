@@ -40,9 +40,19 @@ struct GameLoadingView: View {
         return ImageCache.shared.image(for: path)
     }
 
+    /// Once gameplay starts, render nothing opaque. The banner/scrim
+    /// and NavigationStack container fill would otherwise sit above
+    /// the SDL window inside AppWindow (device compositing).
+    private var isPlayingPhase: Bool { appState.phase == .playing }
+
     var body: some View {
         ZStack {
+            // Keep banner/scrim mounted through the playing handoff so
+            // RootView's opacity fade has something to dissolve. Clear
+            // only the NavigationStack container fill — an opaque
+            // UIKit backdrop would otherwise flash black under the fade.
             Color.black.ignoresSafeArea()
+                .opacity(isPlayingPhase ? 0 : 1)
 
             switch mode {
             case .loading: loadingContent
@@ -51,7 +61,8 @@ struct GameLoadingView: View {
         }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
-        .containerBackground(.black, for: .navigation)
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .containerBackground(isPlayingPhase ? .clear : .black, for: .navigation)
     }
 
     private var loadingContent: some View {

@@ -37,17 +37,33 @@ struct ActionButton: View {
         // modifier alone only scales the glass layer, not content
         // drawn on top of it).
         ZStack {
-            // Fill the Circle with .clear before applying the glass
-            // effect, so the material isn't compositing against the
-            // shape's default foreground fill. Matches the D-pad's
-            // plus shape treatment so both controls render the same
-            // glass brightness.
+            // Opaque backing under glass — same reason as the D-pad:
+            // with the game view embedded in AppWindow, Liquid Glass
+            // otherwise samples the Metal layer on device.
+            Circle()
+                .fill(Color.black)
+
             Circle()
                 .fill(.clear)
                 .glassEffect(.regular.interactive(), in: .circle)
+
+            // Press highlight matching the D-pad arm gradient
+            // (white 0.28 at the rim → clear toward the center).
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [.white.opacity(0), .white.opacity(0.28)],
+                        center: .center,
+                        startRadius: size * 0.15,
+                        endRadius: size / 2
+                    )
+                )
+                .opacity(isPressed ? 1 : 0)
+                .animation(Motion.instant, value: isPressed)
+
             Text(label)
                 .font(.system(size: size < 60 ? 12 : 16, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.9))
+                .foregroundStyle(.white.opacity(isPressed ? 1.0 : 0.9))
         }
         .frame(width: size, height: size)
         .scaleEffect(isPressed ? PressScale.standard : 1.0)
@@ -163,32 +179,42 @@ struct DPad: View {
 
         // Everything here lives inside a single scaled ZStack so the
         // glass plus, per-arm highlights, chevrons, and center dot all
-        // spring together on press. Highlights are clipped to the
-        // plus silhouette so their rounded outer corners don't spill
-        // past the arm tips. The gradient UnitPoints are expressed
-        // in the D-pad's full bounding box (not the arm's local rect)
-        // because SwiftUI resolves `.fill(LinearGradient(...))` on a
-        // Shape against the Shape's full frame.
+        // spring together on press (same structure as v0.2.6).
         ZStack {
-            // Base glass: transparent-fill plus so the material isn't
-            // compositing against the shape's default foreground;
-            // matches the action button's Circle treatment so both
-            // controls render the same glass brightness.
+            // Opaque backing under glass. With the game view embedded
+            // in AppWindow, Liquid Glass otherwise samples the Metal
+            // layer and blooms a clipped top/left highlight on device.
+            // Black keeps the lit rim consistent with v0.2.6 (controls
+            // over letterbox black).
+            plus
+                .fill(Color.black)
+
             plus
                 .fill(.clear)
                 .glassEffect(.regular.interactive(), in: plus)
 
-            // Per-arm active highlights, clipped to the plus outline.
+            // Arm highlights are framed to each arm's local rect so
+            // tip→center UnitPoints are identical for every direction.
+            // Filling a Shape that only draws in one corner of the
+            // full D-pad frame made up/left gradients resolve
+            // differently from down/right on device.
             ZStack {
                 ForEach(DPadDirection.allCases, id: \.self) { dir in
-                    DPadArmHighlight(direction: dir, armFraction: armFraction, cornerFraction: cornerFraction)
+                    let arm = DPadArmGeometry.frame(
+                        direction: dir, size: size, armFraction: armFraction)
+                    let radii = DPadArmGeometry.cornerRadii(
+                        direction: dir, size: size, armFraction: armFraction,
+                        cornerFraction: cornerFraction)
+                    UnevenRoundedRectangle(cornerRadii: radii)
                         .fill(
                             LinearGradient(
                                 colors: [.white.opacity(0.28), .white.opacity(0)],
-                                startPoint: dir.highlightGradientStart,
-                                endPoint: dir.highlightGradientEnd(armFraction: armFraction)
+                                startPoint: dir.localHighlightStart,
+                                endPoint: dir.localHighlightEnd
                             )
                         )
+                        .frame(width: arm.width, height: arm.height)
+                        .position(x: arm.midX, y: arm.midY)
                         .opacity(activeDirections.contains(dir) ? 1 : 0)
                         .animation(Motion.instant, value: activeDirections)
                 }
@@ -208,38 +234,16 @@ struct DPad: View {
         }
         .frame(width: size, height: size)
         // Scale the whole stack on press so glass, highlights,
-        // chevrons, and the center dot all spring together. `.interactive()`
-        // alone scales only the glass layer; this keeps everything
-        // visually coherent including the highlights' clip against
-        // the plus silhouette.
+        // chevrons, and the center dot all spring together.
         .scaleEffect(pressed ? PressScale.standard : 1.0)
         .animation(Motion.controlPress, value: pressed)
         // Force the dark Liquid Glass variant so the plus clip shape
         // doesn't render noticeably brighter than the action buttons'
-        // circles. With the default (system) color scheme, iOS 26's
-        // glass material resolves differently on a concave clip (the
-        // plus) than on a convex clip (the action-button circles),
-        // which showed up in dark gameplay scenes as a near-white
-        // D-pad next to translucent-dark action buttons. Pinning to
-        // .dark here locks the material in one mode and keeps the
-        // two visually consistent.
+        // circles.
         .darkGlass()
-        // Hit-test the full bounding circle so slightly imprecise
-        // presses (between arms, just outside the plus shape) still
-        // engage. The wedge math in updateDirections decides which
-        // direction a given touch point represents.
         .contentShape(Circle())
-        // VoiceOver: describe as a directional pad so users know the
-        // control responds to directional gestures rather than
-        // treating it as a decorative glyph. Direction detection is
-        // continuous-touch based so there's no per-direction button
-        // to expose individually.
         .accessibilityLabel("Directional pad")
         .accessibilityHint("Touch and drag to move the character")
-        // VoiceOver otherwise swallows the drag gesture because it
-        // interprets taps as element activation. Direct interaction
-        // tells VoiceOver to pass raw touches through so holding
-        // and sliding across directions works with the rotor off.
         .accessibilityAddTraits(.allowsDirectInteraction)
         .gesture(editing ? nil : dpadGesture)
         .onChange(of: editing) { _, newValue in
@@ -372,38 +376,24 @@ enum DPadDirection: CaseIterable, Hashable {
         }
     }
 
-    /// Gradient start/end points used to fade the arm highlight from
-    /// full opacity at the outer tip to transparent at the inner edge
-    /// (where the arm meets the center square).
-    ///
-    /// Points are in UnitPoint space of the FULL D-pad bounding box
-    /// (not the arm's local rect), because SwiftUI's
-    /// `.fill(LinearGradient(...))` resolves UnitPoints against the
-    /// shape's full frame. The `DPadArmHighlight` shape receives
-    /// the D-pad rect and draws a path inside one arm, so the
-    /// gradient must be sized to cover only the arm's extent to
-    /// be visible; `.top` -> `.bottom` across the full D-pad would
-    /// show only a shallow falloff within the arm.
-    ///
-    /// The arm's outer tip is at the D-pad's edge (0 or 1 along its
-    /// axis), and its inner edge is at the center-square boundary,
-    /// which in UnitPoints is `(1 - armFraction) / 2` from the
-    /// outer edge.
-    var highlightGradientStart: UnitPoint {
+    /// Tip → center gradient in the arm's *local* frame (after the
+    /// highlight view is sized to that arm). Same UnitPoints for every
+    /// direction so up/left match down/right on device.
+    var localHighlightStart: UnitPoint {
         switch self {
-        case .up: return UnitPoint(x: 0.5, y: 0)
-        case .down: return UnitPoint(x: 0.5, y: 1)
-        case .left: return UnitPoint(x: 0, y: 0.5)
-        case .right: return UnitPoint(x: 1, y: 0.5)
+        case .up: return .top
+        case .down: return .bottom
+        case .left: return .leading
+        case .right: return .trailing
         }
     }
-    func highlightGradientEnd(armFraction: CGFloat) -> UnitPoint {
-        let armLenFrac = (1 - armFraction) / 2
+
+    var localHighlightEnd: UnitPoint {
         switch self {
-        case .up: return UnitPoint(x: 0.5, y: armLenFrac)
-        case .down: return UnitPoint(x: 0.5, y: 1 - armLenFrac)
-        case .left: return UnitPoint(x: armLenFrac, y: 0.5)
-        case .right: return UnitPoint(x: 1 - armLenFrac, y: 0.5)
+        case .up: return .bottom
+        case .down: return .top
+        case .left: return .trailing
+        case .right: return .leading
         }
     }
 }
@@ -588,72 +578,55 @@ private struct DPadPlusShape: Shape {
     }
 }
 
-/// Highlight fill for one arm of the plus. Rectangle fitted inside
-/// the arm with asymmetric corner rounding: outer corners match the
-/// plus shape's arm-tip radius, while inner corners (against the
-/// center square) use a smaller radius so the highlight visually
-/// settles into the arm rather than mirroring the tip.
-private struct DPadArmHighlight: Shape {
-    let direction: DPadDirection
-    let armFraction: CGFloat
-    let cornerFraction: CGFloat
+/// Layout math for one arm of the D-pad plus. Shared by the highlight
+/// views so frame + corner radii stay in sync with `DPadPlusShape`.
+private enum DPadArmGeometry {
+    static let innerCornerRatio: CGFloat = 0.5
 
-    /// Fraction of the outer corner radius to use for the inner
-    /// corners. 0.5 gives a subtle "less rounded" look; 0 would be
-    /// sharp inner corners (matches the plus's sharp inner edges).
-    private static let innerRatio: CGFloat = 0.5
-
-    func path(in rect: CGRect) -> Path {
-        let armW = rect.width * armFraction
-        let armH = rect.height * armFraction
-        let outerR = min(armW * cornerFraction, armW / 2, armH / 2)
-        let innerR = outerR * Self.innerRatio
-        let hInset = (rect.height - armH) / 2
-        let vInset = (rect.width - armW) / 2
-        // The arm spans from the outer edge of the bounding box to
-        // the edge of the center square (armLen long). Do NOT extend
-        // into the center square - that would cover the center dot
-        // and visually bleed into the orthogonal arms.
-        let armLen = (rect.width - armW) / 2
-
-        let armRect: CGRect
-        let radii: RectangleCornerRadii
+    static func frame(
+        direction: DPadDirection, size: CGFloat, armFraction: CGFloat
+    ) -> CGRect {
+        let armW = size * armFraction
+        let armH = size * armFraction
+        let hInset = (size - armH) / 2
+        let vInset = (size - armW) / 2
+        let armLen = (size - armW) / 2
         switch direction {
         case .up:
-            // Top arm: rounded top (outer) corners, less-rounded
-            // bottom (inner) corners.
-            armRect = CGRect(x: vInset, y: 0, width: armW, height: armLen)
-            radii = RectangleCornerRadii(
-                topLeading: outerR,
-                bottomLeading: innerR,
-                bottomTrailing: innerR,
-                topTrailing: outerR
-            )
+            return CGRect(x: vInset, y: 0, width: armW, height: armLen)
         case .down:
-            armRect = CGRect(x: vInset, y: rect.height - armLen, width: armW, height: armLen)
-            radii = RectangleCornerRadii(
-                topLeading: innerR,
-                bottomLeading: outerR,
-                bottomTrailing: outerR,
-                topTrailing: innerR
-            )
+            return CGRect(x: vInset, y: size - armLen, width: armW, height: armLen)
         case .left:
-            armRect = CGRect(x: 0, y: hInset, width: armLen, height: armH)
-            radii = RectangleCornerRadii(
-                topLeading: outerR,
-                bottomLeading: outerR,
-                bottomTrailing: innerR,
-                topTrailing: innerR
-            )
+            return CGRect(x: 0, y: hInset, width: armLen, height: armH)
         case .right:
-            armRect = CGRect(x: rect.width - armLen, y: hInset, width: armLen, height: armH)
-            radii = RectangleCornerRadii(
-                topLeading: innerR,
-                bottomLeading: innerR,
-                bottomTrailing: outerR,
-                topTrailing: outerR
-            )
+            return CGRect(x: size - armLen, y: hInset, width: armLen, height: armH)
         }
-        return UnevenRoundedRectangle(cornerRadii: radii).path(in: armRect)
+    }
+
+    static func cornerRadii(
+        direction: DPadDirection, size: CGFloat, armFraction: CGFloat,
+        cornerFraction: CGFloat
+    ) -> RectangleCornerRadii {
+        let armW = size * armFraction
+        let outerR = min(armW * cornerFraction, armW / 2)
+        let innerR = outerR * innerCornerRatio
+        switch direction {
+        case .up:
+            return RectangleCornerRadii(
+                topLeading: outerR, bottomLeading: innerR,
+                bottomTrailing: innerR, topTrailing: outerR)
+        case .down:
+            return RectangleCornerRadii(
+                topLeading: innerR, bottomLeading: outerR,
+                bottomTrailing: outerR, topTrailing: innerR)
+        case .left:
+            return RectangleCornerRadii(
+                topLeading: outerR, bottomLeading: outerR,
+                bottomTrailing: innerR, topTrailing: innerR)
+        case .right:
+            return RectangleCornerRadii(
+                topLeading: innerR, bottomLeading: innerR,
+                bottomTrailing: outerR, topTrailing: outerR)
+        }
     }
 }

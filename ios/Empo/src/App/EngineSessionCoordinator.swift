@@ -31,6 +31,13 @@ final class EngineSessionCoordinator {
     private var terminationExpected = false
     private var textInputModeHandler: ((Bool) -> Void)?
     private var inputBridgesInstalled = false
+    /// Per-scancode press start times. Light taps release before the
+    /// RGSS thread observes a pressed-edge; we defer KEYUP until the
+    /// key has been down for at least one frame (~16ms @ 60fps, with
+    /// headroom). Same idea as `injectKeyTap(holdMilliseconds:)`.
+    private var keyPressStartedAt: [Int32: ContinuousClock.Instant] = [:]
+    private var pendingKeyReleases: [Int32: Task<Void, Never>] = [:]
+    private static let minimumKeyHold: Duration = .milliseconds(50)
 
     var pendingCrashRecovery: Bool { crashTracker.pendingCrashRecovery }
 
@@ -67,6 +74,7 @@ final class EngineSessionCoordinator {
 
     /// Returns whether the engine thread was still running before terminate.
     func beginReturnToLibrary(selectedContainer: GameContainer?) -> Bool {
+        clearPendingKeyHolds()
         recordSessionPlayTime(for: delegate?.coordinatorActiveSessionGame)
         if let selectedContainer {
             crashTracker.removeMarker(for: selectedContainer)
@@ -119,7 +127,35 @@ final class EngineSessionCoordinator {
     }
 
     func injectKey(scancode: Int32, pressed: Bool) {
-        mkxp_injectKeyEvent(scancode, pressed ? 1 : 0)
+        if pressed {
+            pendingKeyReleases.removeValue(forKey: scancode)?.cancel()
+            keyPressStartedAt[scancode] = .now
+            mkxp_injectKeyEvent(scancode, 1)
+            return
+        }
+
+        pendingKeyReleases.removeValue(forKey: scancode)?.cancel()
+
+        guard let started = keyPressStartedAt[scancode] else {
+            mkxp_injectKeyEvent(scancode, 0)
+            return
+        }
+
+        let held = ContinuousClock.now - started
+        if held >= Self.minimumKeyHold {
+            keyPressStartedAt.removeValue(forKey: scancode)
+            mkxp_injectKeyEvent(scancode, 0)
+            return
+        }
+
+        let remaining = Self.minimumKeyHold - held
+        pendingKeyReleases[scancode] = Task { @MainActor in
+            try? await Task.sleep(for: remaining)
+            guard !Task.isCancelled else { return }
+            self.keyPressStartedAt.removeValue(forKey: scancode)
+            self.pendingKeyReleases.removeValue(forKey: scancode)
+            mkxp_injectKeyEvent(scancode, 0)
+        }
     }
 
     func injectKeyTap(scancode: Int32, holdMilliseconds: Int = 50) {
@@ -128,6 +164,17 @@ final class EngineSessionCoordinator {
             try? await Task.sleep(for: .milliseconds(holdMilliseconds))
             injectKey(scancode: scancode, pressed: false)
         }
+    }
+
+    private func clearPendingKeyHolds() {
+        for task in pendingKeyReleases.values {
+            task.cancel()
+        }
+        pendingKeyReleases.removeAll()
+        for scancode in keyPressStartedAt.keys {
+            mkxp_injectKeyEvent(scancode, 0)
+        }
+        keyPressStartedAt.removeAll()
     }
 
     private func installInputBridgesIfNeeded() {

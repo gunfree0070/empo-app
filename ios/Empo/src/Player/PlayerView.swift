@@ -172,6 +172,7 @@ struct PlayerView: View {
             }
         }
         .ignoresSafeArea()
+        .background(Color.clear)
         .onAppear {
             // Engine fired SDL_StartTextInput / SDL_StopTextInput when
             // the game toggles `Input.text_input`. Auto-flip keyboard
