@@ -23,6 +23,15 @@
       ],
       "versions": [
         {
+          "version": "0.2.9",
+          "buildVersion": "418",
+          "date": "2026-07-08",
+          "localizedDescription": "### Bug Fixes\n\n- Allow continuing past RTP launch warning ([`5c941a4`](https://github.com/mateo-m/empo-app/commit/5c941a45dd2a1f15f2bfa5f46b1be0633236517e))",
+          "downloadURL": "https://github.com/mateo-m/empo-app/releases/download/v0.2.9/Empo-0.2.9-unsigned.ipa",
+          "size": 16398324,
+          "minOSVersion": "26.0"
+        },
+        {
           "version": "0.2.8",
           "buildVersion": "415",
           "date": "2026-07-08",
