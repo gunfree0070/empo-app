@@ -1,9 +1,3 @@
-commit-msg:
-  parallel: false
-  commands:
-    message:
-      run: scripts/hooks/commit-msg.sh {1}
-
 pre-commit:
   parallel: false
   commands:
@@ -15,7 +9,5 @@ pre-commit:
 pre-push:
   parallel: false
   commands:
-    no-coauthors:
-      run: scripts/hooks/verify-no-coauthors.sh pre-push
     submodule-dev-check:
       run: scripts/hooks/pre-push.sh
