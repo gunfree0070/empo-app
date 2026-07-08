@@ -26,6 +26,12 @@ enum ArchiveExtractor {
         }
     }
 
+    struct Inventory: Hashable, Sendable {
+        var entryCount: Int = 0
+        var totalUncompressedBytes: Int64 = 0
+        var allSizesKnown: Bool = true
+    }
+
     /// Supported archive container formats.
     enum Format {
         case zip
@@ -59,6 +65,7 @@ enum ArchiveExtractor {
         /// validation to short-circuit once the needed scripts
         /// file has been pulled, avoiding a full walk to EOF.
         stopWhen: (() -> Bool)? = nil,
+        onEntry: ((_ relativePath: String, _ uncompressedSize: Int64?) -> Void)? = nil,
         include: (String) -> Bool
     ) throws {
         let fm = FileManager.default
@@ -116,6 +123,10 @@ enum ArchiveExtractor {
                 continue
             }
 
+            let uncompressedSize: Int64? =
+                archive_entry_size_is_set(entry) != 0 ? archive_entry_size(entry) : nil
+            onEntry?(relative, uncompressedSize)
+
             if !include(relative) {
                 archive_read_data_skip(reader)
                 continue
@@ -126,7 +137,7 @@ enum ArchiveExtractor {
             if !fm.fileExists(atPath: parent.path) {
                 try? fm.createDirectory(at: parent, withIntermediateDirectories: true)
             }
-            try writeEntry(reader: reader, to: outURL)
+            _ = try writeEntry(reader: reader, to: outURL)
 
             if stopWhen?() == true { break }
         }
@@ -144,6 +155,7 @@ enum ArchiveExtractor {
         archive archiveURL: URL,
         to destDir: URL,
         shouldCancel: (() -> Bool)? = nil,
+        inventory: Inventory? = nil,
         progress: ((String, Double) -> Void)? = nil,
         onFileWritten: ((String, URL) -> Void)? = nil
     ) throws {
@@ -152,17 +164,16 @@ enum ArchiveExtractor {
             try fm.createDirectory(at: destDir, withIntermediateDirectories: true)
         }
 
-        // For 7z the file size is intentionally ignored and progress trickles
-        // progress by entry index. libarchive reads the entire solid
-        // compressed block upfront, so `archive_filter_bytes` would
-        // jump to ~100% on the first entry even though extraction has
-        // barely started, flashing the progress ring as fully-filled.
+        // For 7z the compressed file size is intentionally ignored when no
+        // probe inventory is available. libarchive reads the entire solid
+        // compressed block upfront, so `archive_filter_bytes` would jump to
+        // ~100% on the first entry even though extraction has barely started.
         let is7z = archiveURL.pathExtension.lowercased() == "7z"
-        let totalBytes: Int64
+        let compressedTotalBytes: Int64
         if is7z {
-            totalBytes = 0
+            compressedTotalBytes = 0
         } else {
-            totalBytes =
+            compressedTotalBytes =
                 (try? fm.attributesOfItem(atPath: archiveURL.path)[.size] as? NSNumber)?.int64Value ?? 0
         }
 
@@ -171,15 +182,9 @@ enum ArchiveExtractor {
         }
         defer { archive_read_free(reader) }
 
-        // Enable every format/filter libarchive supports. Small code footprint,
-        // and guessing the format from the extension isn't reliable: JGP files
-        // can legitimately be identified as zip, but a user could rename a 7z
-        // file to something else. libarchive sniffs the content.
         archive_read_support_format_all(reader)
         archive_read_support_filter_all(reader)
 
-        // 10 MiB block size: balances syscall overhead against memory. The
-        // archive itself is never fully loaded; this is just the read window.
         let blockSize = 10 * 1024 * 1024
         let openResult = archiveURL.path.withCString {
             archive_read_open_filename(reader, $0, blockSize)
@@ -189,6 +194,7 @@ enum ArchiveExtractor {
         }
 
         var bytesProcessed: Int64 = 0
+        var uncompressedWritten: Int64 = 0
         var entryIndex = 0
 
         var entry: OpaquePointer?
@@ -205,10 +211,6 @@ enum ArchiveExtractor {
             guard let cPath = archive_entry_pathname(entry) else { continue }
             let rawName = String(cString: cPath)
 
-            // Normalise and reject path traversal (zip-slip and friends).
-            // Split on "/" and check for components that are exactly "..",
-            // not substrings - "file..ext" is a valid filename and must not be
-            // rejected.
             let relative = rawName.replacingOccurrences(of: "\\", with: "/")
             let components = relative.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
             if relative.hasPrefix("/") || components.contains("..") {
@@ -219,17 +221,10 @@ enum ArchiveExtractor {
                 continue
             }
 
-            // The component-level `..` check above is the real defense
-            // against zip-slip. A prefix check on the resolved filesystem
-            // path is tempting as a belt-and-suspenders guard but it
-            // false-positives on iOS real devices where /var and
-            // /private/var show up inconsistently between the destDir
-            // URL (created from `fm.temporaryDirectory`) and the child
-            // path canonicalisation pipelines.
             let outURL = destDir.appendingPathComponent(relative)
 
             let fileType = archive_entry_filetype(entry)
-            let isDir = (fileType & 0o170000) == 0o040000  // S_IFDIR
+            let isDir = (fileType & 0o170000) == 0o040000
             if isDir {
                 try? fm.createDirectory(at: outURL, withIntermediateDirectories: true)
                 continue
@@ -240,18 +235,27 @@ enum ArchiveExtractor {
                 try? fm.createDirectory(at: parent, withIntermediateDirectories: true)
             }
 
-            try writeEntry(reader: reader, to: outURL)
+            let written = try writeEntry(reader: reader, to: outURL)
+            uncompressedWritten += Int64(written)
             onFileWritten?(relative, outURL)
 
             entryIndex += 1
             if let progress {
-                let currentOffset = archive_filter_bytes(reader, -1)
-                bytesProcessed = currentOffset > 0 ? currentOffset : bytesProcessed
                 let pct: Double
-                if totalBytes > 0 {
-                    pct = min(1.0, max(0.0, Double(bytesProcessed) / Double(totalBytes)))
+                if let inventory,
+                    inventory.allSizesKnown,
+                    inventory.totalUncompressedBytes > 0
+                {
+                    pct = min(
+                        0.999,
+                        max(0.0, Double(uncompressedWritten) / Double(inventory.totalUncompressedBytes)))
+                } else if let inventory, inventory.entryCount > 0 {
+                    pct = min(0.999, Double(entryIndex) / Double(inventory.entryCount))
+                } else if compressedTotalBytes > 0 {
+                    let currentOffset = archive_filter_bytes(reader, -1)
+                    bytesProcessed = currentOffset > 0 ? currentOffset : bytesProcessed
+                    pct = min(1.0, max(0.0, Double(bytesProcessed) / Double(compressedTotalBytes)))
                 } else {
-                    // No size hint (solid archive): trickle progress every 50 entries.
                     pct = min(0.99, Double(entryIndex) / 1000.0)
                 }
                 if entryIndex % 25 == 0 || pct >= 0.99 {
@@ -263,13 +267,15 @@ enum ArchiveExtractor {
         progress?("", 1.0)
     }
 
-    private static func writeEntry(reader: OpaquePointer, to outURL: URL) throws {
+    @discardableResult
+    private static func writeEntry(reader: OpaquePointer, to outURL: URL) throws -> Int {
         guard let stream = OutputStream(url: outURL, append: false) else {
             throw Error.writeFailed("Cannot open output: \(outURL.path)")
         }
         stream.open()
         defer { stream.close() }
 
+        var totalWritten = 0
         while true {
             var buffer: UnsafeRawPointer?
             var size: Int = 0
@@ -285,7 +291,9 @@ enum ArchiveExtractor {
             if written < 0 {
                 throw Error.writeFailed(stream.streamError?.localizedDescription ?? "Write failed")
             }
+            totalWritten += written
         }
+        return totalWritten
     }
 
     private static func errorString(_ reader: OpaquePointer) -> String? {

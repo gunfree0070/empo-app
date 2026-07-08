@@ -43,7 +43,6 @@ enum ImportTemporaryDirectory {
         case stagedArchive = "staged-archives"
         case archiveChoiceProbe = "archive-choice-probe"
         case folderImport = "folder-import"
-        case archivePreflight = "archive-preflight"
         case archiveImport = "archive-import"
     }
 
@@ -110,10 +109,12 @@ class GameLibrary {
             : false
         let skipIDs = inFlightImports.withLock { Set($0) }
         Task.detached {
-            let scanned = GameCatalog.scanGames(
-                cleanupInvalid: cleanupInvalid,
-                skipIDs: skipIDs
-            )
+            let scanned = ImportSignpost.interval("library-scan", id: "reload") {
+                GameCatalog.scanGames(
+                    cleanupInvalid: cleanupInvalid,
+                    skipIDs: skipIDs
+                )
+            }
             let scannedByID = Dictionary(uniqueKeysWithValues: scanned.map { ($0.id, $0) })
 
             await MainActor.run {
@@ -133,6 +134,30 @@ class GameLibrary {
                     lib.games.removeAll { !$0.isImporting && !scannedByID.keys.contains($0.id) }
 
                     for entry in scanned where !updatedIDs.contains(entry.id) {
+                        lib.games.append(entry)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Merge a single just-imported container into `games` without
+    /// rescanning the whole library. Falls back to a full reload if
+    /// the entry can't be built (metadata missing, etc.).
+    func mergeImportedGame(container: GameContainer) {
+        let importID = container.id
+        Task.detached {
+            let entry = GameCatalog.buildGameEntry(from: container)
+            await MainActor.run {
+                let lib = GameLibrary.shared
+                guard let entry else {
+                    lib.reload()
+                    return
+                }
+                withAnimation {
+                    if let idx = lib.games.firstIndex(where: { $0.id == importID }) {
+                        lib.games[idx] = entry
+                    } else {
                         lib.games.append(entry)
                     }
                 }

@@ -19,14 +19,20 @@ struct QueuedImportRequest: Identifiable, Hashable, Sendable {
 struct ImportSelection: Hashable, Sendable {
     let relativePath: String
     let displayName: String
+    let iconPNG: Data?
 
-    init(relativePath: String, displayName: String) {
+    init(relativePath: String, displayName: String, iconPNG: Data? = nil) {
         self.relativePath = relativePath
         self.displayName = displayName
+        self.iconPNG = iconPNG
     }
 
     init(choice: GameImportValidator.ImportRootChoice) {
-        self.init(relativePath: choice.relativePath, displayName: choice.title)
+        self.init(
+            relativePath: choice.relativePath,
+            displayName: choice.title,
+            iconPNG: choice.artwork?.iconData
+        )
     }
 }
 
@@ -63,6 +69,7 @@ struct ImportPipelineSession {
 
     let request: QueuedImportRequest
     var preparedSource: ImportPreparedSource?
+    var probeInventory: ArchiveExtractor.Inventory?
     var state: State
 }
 
@@ -157,11 +164,14 @@ final class ImportPipeline {
                 currentSession?.preparedSource = preparedSource
                 currentSession?.state = .probing
 
-                let choices = try await ImportPipelineService.probeChoices(for: preparedSource)
+                let probeResult = try await ImportPipelineService.probeChoices(for: preparedSource)
                 guard isCurrentSession(request.id) else {
                     preparedSource.cleanup()
                     return
                 }
+
+                currentSession?.probeInventory = probeResult.inventory
+                let choices = probeResult.choices
 
                 if choices.count > 1 {
                     currentSession?.state = .awaitingChoice(choices)
@@ -207,6 +217,7 @@ final class ImportPipeline {
         startImports(
             from: preparedSource,
             archiveName: currentSession.request.archiveName,
+            inventory: currentSession.probeInventory,
             selections: selections
         )
 
@@ -217,6 +228,7 @@ final class ImportPipeline {
     private func startImports(
         from preparedSource: ImportPreparedSource,
         archiveName: String,
+        inventory: ArchiveExtractor.Inventory?,
         selections: [ImportSelection]
     ) {
         guard !selections.isEmpty else {
@@ -233,51 +245,45 @@ final class ImportPipeline {
             return
         }
 
-        let completionTracker = ImportCompletionTracker(count: selections.count) {
-            preparedSource.cleanup()
-        }
-
-        for selection in selections {
-            startImport(
-                with: library,
-                from: preparedSource.workingURL,
-                archiveName: archiveName,
-                selection: selection,
-                completionTracker: completionTracker
+        let isArchive = ArchiveExtractor.Format(extension: preparedSource.workingURL.pathExtension) != nil
+        let batchSelections = selections.map { selection in
+            GameLibrary.BatchSelection(
+                importID: UUID().uuidString,
+                relativePath: selection.relativePath,
+                displayName: selection.displayName,
+                iconPNG: selection.iconPNG
             )
         }
-    }
 
-    private func startImport(
-        with library: GameLibrary,
-        from url: URL,
-        archiveName: String,
-        selection: ImportSelection,
-        completionTracker: ImportCompletionTracker
-    ) {
-        let accessing = url.startAccessingSecurityScopedResource()
+        let accessing = preparedSource.workingURL.startAccessingSecurityScopedResource()
 
-        library.pipelineImportGame(
-            from: url,
-            preferredGameRootRelativePath: selection.relativePath,
-            preferredDisplayName: selection.displayName
-        ) { error in
-            if accessing { url.stopAccessingSecurityScopedResource() }
+        library.pipelineImportGames(
+            from: preparedSource.workingURL,
+            isArchive: isArchive,
+            sourceName: archiveName,
+            inventory: inventory,
+            selections: batchSelections
+        ) { failures in
+            if accessing { preparedSource.workingURL.stopAccessingSecurityScopedResource() }
+            preparedSource.cleanup()
 
-            if let error {
-                if error is GameLibrary.ImportCancelled {
-                    // User cancelled; finish cleanup without surfacing UI.
-                } else {
-                    self.presentError(
-                        title: "Couldn't import \(quoted(archiveName))",
-                        message: error.localizedDescription
-                    )
-                }
-            } else {
+            let succeeded = batchSelections.count - failures.count
+            if succeeded > 0 {
                 Haptics.impact()
             }
-
-            completionTracker.finishOne()
+            let surfacedFailures = failures.filter { !($0.1 is GameLibrary.ImportCancelled) }
+            if let first = surfacedFailures.first {
+                self.presentError(
+                    title: "Couldn't import \(quoted(archiveName))",
+                    message: first.1.localizedDescription
+                )
+                for extra in surfacedFailures.dropFirst() {
+                    NSLog(
+                        "[ImportPipeline] Additional import failure: %@",
+                        extra.1.localizedDescription
+                    )
+                }
+            }
         }
     }
 
@@ -300,28 +306,6 @@ final class ImportPipeline {
     }
 }
 
-private final class ImportCompletionTracker: @unchecked Sendable {
-    private let lock = NSLock()
-    private var remaining: Int
-    private let onComplete: @Sendable () -> Void
-
-    init(count: Int, onComplete: @escaping @Sendable () -> Void) {
-        remaining = count
-        self.onComplete = onComplete
-    }
-
-    func finishOne() {
-        let shouldComplete: Bool = lock.withLock {
-            remaining -= 1
-            return remaining == 0
-        }
-
-        if shouldComplete {
-            onComplete()
-        }
-    }
-}
-
 private enum ImportPipelineService {
     static func prepareSource(for request: QueuedImportRequest) async throws -> ImportPreparedSource {
         try await Task(priority: .userInitiated) {
@@ -332,7 +316,7 @@ private enum ImportPipelineService {
 
     static func probeChoices(
         for preparedSource: ImportPreparedSource
-    ) async throws -> [GameImportValidator.ImportRootChoice] {
+    ) async throws -> GameImportValidator.ArchiveProbeResult {
         try await Task(priority: .userInitiated) {
             try probeChoicesSync(for: preparedSource)
         }
@@ -340,48 +324,57 @@ private enum ImportPipelineService {
     }
 
     private static func prepareSourceSync(for request: QueuedImportRequest) throws -> ImportPreparedSource {
-        let url = request.sourceURL
-        let accessing = url.startAccessingSecurityScopedResource()
-        defer {
-            if accessing { url.stopAccessingSecurityScopedResource() }
-        }
-
-        guard ArchiveExtractor.Format(extension: url.pathExtension) != nil else {
-            return ImportPreparedSource(
-                workingURL: url,
-                cleanupDirectoryURL: nil
-            )
-        }
-
-        let fm = FileManager.default
-        let archiveCopyDirectoryURL = try ImportTemporaryDirectory.makeScopedDirectory(
-            kind: .stagedArchive,
-            fm: fm
-        )
-        let archiveCopyURL = archiveCopyDirectoryURL.appendingPathComponent(url.lastPathComponent)
-        var copied = false
-        defer {
-            if !copied {
-                try? fm.removeItem(at: archiveCopyDirectoryURL)
+        try ImportSignpost.interval("stage-source", id: request.id.uuidString) {
+            let url = request.sourceURL
+            let accessing = url.startAccessingSecurityScopedResource()
+            defer {
+                if accessing { url.stopAccessingSecurityScopedResource() }
             }
+
+            guard ArchiveExtractor.Format(extension: url.pathExtension) != nil else {
+                return ImportPreparedSource(
+                    workingURL: url,
+                    cleanupDirectoryURL: nil
+                )
+            }
+
+            let fm = FileManager.default
+            let archiveCopyDirectoryURL = try ImportTemporaryDirectory.makeScopedDirectory(
+                kind: .stagedArchive,
+                fm: fm
+            )
+            let archiveCopyURL = archiveCopyDirectoryURL.appendingPathComponent(url.lastPathComponent)
+            var copied = false
+            defer {
+                if !copied {
+                    try? fm.removeItem(at: archiveCopyDirectoryURL)
+                }
+            }
+
+            do {
+                try fm.moveItem(at: url, to: archiveCopyURL)
+            } catch {
+                try fm.copyItem(at: url, to: archiveCopyURL)
+            }
+            copied = true
+
+            return ImportPreparedSource(
+                workingURL: archiveCopyURL, cleanupDirectoryURL: archiveCopyDirectoryURL)
         }
-
-        try fm.copyItem(at: url, to: archiveCopyURL)
-        copied = true
-
-        return ImportPreparedSource(workingURL: archiveCopyURL, cleanupDirectoryURL: archiveCopyDirectoryURL)
     }
 
     private static func probeChoicesSync(
         for preparedSource: ImportPreparedSource
-    ) throws -> [GameImportValidator.ImportRootChoice] {
-        let url = preparedSource.workingURL
-        let accessing = url.startAccessingSecurityScopedResource()
-        defer {
-            if accessing { url.stopAccessingSecurityScopedResource() }
-        }
+    ) throws -> GameImportValidator.ArchiveProbeResult {
+        try ImportSignpost.interval("probe", id: preparedSource.workingURL.lastPathComponent) {
+            let url = preparedSource.workingURL
+            let accessing = url.startAccessingSecurityScopedResource()
+            defer {
+                if accessing { url.stopAccessingSecurityScopedResource() }
+            }
 
-        return try GameImportValidator.importRootChoices(for: url)
+            return try GameImportValidator.importRootChoices(for: url)
+        }
     }
 }
 
@@ -399,6 +392,13 @@ extension NSLock {
 
 extension GameLibrary {
     struct ImportCancelled: Error {}
+
+    struct BatchSelection: Sendable {
+        let importID: String
+        let relativePath: String
+        let displayName: String
+        let iconPNG: Data?
+    }
 
     /// Errors surfaced from the import pipeline with display-ready
     /// messages. Used to remap low-level Foundation errors (disk
@@ -506,89 +506,343 @@ extension GameLibrary {
         }
     }
 
-    func pipelineImportGame(
+    func pipelineImportGames(
         from sourceURL: URL,
-        preferredGameRootRelativePath: String? = nil,
-        preferredDisplayName: String? = nil,
-        completion: @escaping @MainActor @Sendable (Error?) -> Void
+        isArchive: Bool,
+        sourceName: String,
+        inventory: ArchiveExtractor.Inventory?,
+        selections: [GameLibrary.BatchSelection],
+        completion: @escaping @MainActor @Sendable (_ failures: [(GameLibrary.BatchSelection, Error)]) -> Void
     ) {
         ensureGamesDirectory()
 
-        let archiveFormat = ArchiveExtractor.Format(extension: sourceURL.pathExtension)
-        let importID = UUID().uuidString
-        let sourceName =
-            archiveFormat == nil
-            ? sourceURL.lastPathComponent
-            : sourceURL.deletingPathExtension().lastPathComponent
-        let pendingDisplayName = preferredDisplayName ?? sourceName
-        let pendingOrder = nextPendingImportOrder
-        nextPendingImportOrder += 1
+        for selection in selections {
+            let pendingOrder = nextPendingImportOrder
+            nextPendingImportOrder += 1
+            pendingImports[selection.importID] = PendingImport(
+                id: selection.importID,
+                displayName: selection.displayName,
+                order: pendingOrder
+            )
+            inFlightImports.withLock { _ = $0.insert(selection.importID) }
+        }
 
-        // Pre-flight phase: button shows "Validating", library keeps
-        // its current UI (empty state or existing list). Once
-        // pre-flight passes a progress card is committed to `games` and
-        // extraction/finalisation runs with the card visible.
-        pendingImports[importID] = PendingImport(
-            id: importID,
-            displayName: pendingDisplayName,
-            order: pendingOrder
-        )
-        // Mark the import as in-flight so concurrent library scans
-        // (triggered by sibling imports finishing) skip this
-        // container until the move is committed and metadata is
-        // written. Removed in the detached task's defer.
-        inFlightImports.withLock { _ = $0.insert(importID) }
-
+        let batchID = UUID().uuidString
         Task.detached(priority: .userInitiated) {
-            defer { self.clearCancellation(importID) }
-            // Drop from in-flight set BEFORE queuing the reload
-            // call so the post-completion scan sees this container
-            // as a normal candidate (not skipped). Doing this in a
-            // `defer` would push it past the `await MainActor.run`
-            // closure and reload's scan would still treat the
-            // just-finished import as in-flight, leaving the card
-            // stuck on `.importing` forever.
-            let markNotInFlight = {
-                self.inFlightImports.withLock { _ = $0.remove(importID) }
+            defer {
+                for selection in selections {
+                    self.clearCancellation(selection.importID)
+                }
             }
+
+            var active = selections
+            var failures: [(GameLibrary.BatchSelection, Error)] = []
+            var containers: [String: GameContainer] = [:]
+            var surfacers: [String: ExeIconSurfacer] = [:]
+            let fm = FileManager.default
+
+            func failSelection(_ sel: GameLibrary.BatchSelection, _ error: Error) {
+                failures.append((sel, error))
+                active.removeAll { $0.importID == sel.importID }
+                self.inFlightImports.withLock { _ = $0.remove(sel.importID) }
+                Task { @MainActor in
+                    GameLibrary.shared.abandonImport(
+                        importID: sel.importID, container: containers[sel.importID])
+                }
+            }
+
+            func checkCancellations() {
+                let cancelled = active.filter { self.isImportCancelled($0.importID) }
+                for sel in cancelled {
+                    failSelection(sel, ImportCancelled())
+                }
+            }
+
+            func writeProbeIconSidecar(_ iconPNG: Data?, to container: GameContainer) -> String? {
+                guard let iconPNG else { return nil }
+                container.ensureMetadataDirectory()
+                let sidecarURL = container.exeIconSidecarURL
+                guard (try? iconPNG.write(to: sidecarURL)) != nil else { return nil }
+                return sidecarURL.path
+            }
+
+            func resolveRoot(in baseURL: URL, relativePath: String) throws -> URL {
+                if relativePath.isEmpty {
+                    return GameImportValidator.locateGameRoot(in: baseURL)
+                        ?? GameContainer.findGameRoot(in: baseURL)
+                }
+                return try GameImportValidator.resolveGameRoot(in: baseURL, relativePath: relativePath)
+            }
+
+            func failAllActive(_ error: Error) {
+                for sel in active {
+                    failSelection(sel, error)
+                }
+            }
+
             do {
-                if archiveFormat != nil {
-                    try self.importArchive(
-                        from: sourceURL,
-                        importID: importID,
-                        sourceName: sourceName,
-                        preferredGameRootRelativePath: preferredGameRootRelativePath
-                    )
+                checkCancellations()
+                guard !active.isEmpty else {
+                    await MainActor.run { completion(failures) }
+                    return
+                }
+
+                let tmpDir = try ImportTemporaryDirectory.makeScopedDirectory(
+                    kind: isArchive ? .archiveImport : .folderImport,
+                    fm: fm
+                )
+                defer { try? fm.removeItem(at: tmpDir) }
+
+                let stagedBaseURL: URL
+                if isArchive {
+                    for sel in active {
+                        let container = GameContainer(
+                            id: sel.importID,
+                            slug: GameContainer.slugify(sel.displayName)
+                        )
+                        containers[sel.importID] = container
+                        let artworkPath = writeProbeIconSidecar(sel.iconPNG, to: container)
+                        self.commitPendingToCard(
+                            sel.importID,
+                            container: container,
+                            title: sel.displayName,
+                            artworkPath: artworkPath
+                        )
+                        surfacers[sel.importID] = ExeIconSurfacer(container: container) { path in
+                            self.updateCardArtwork(sel.importID, artworkPath: path)
+                        }
+                    }
+
+                    try ImportSignpost.interval("extract", id: batchID) {
+                        try ArchiveExtractor.extract(
+                            archive: sourceURL,
+                            to: tmpDir,
+                            shouldCancel: {
+                                checkCancellations()
+                                return active.isEmpty
+                                    || active.allSatisfy { self.isImportCancelled($0.importID) }
+                            },
+                            inventory: inventory,
+                            progress: { _, pct in
+                                checkCancellations()
+                                let scaled = pct * 0.95
+                                for sel in active {
+                                    self.updateCardProgress(sel.importID, scaled)
+                                }
+                            },
+                            onFileWritten: { relative, diskURL in
+                                guard relative.lowercased().hasSuffix(".exe") else { return }
+                                let filename = (relative as NSString).lastPathComponent
+                                guard let sel = Self.matchingSelection(for: relative, in: active) else {
+                                    return
+                                }
+                                guard
+                                    Self.isRootLevelExe(
+                                        relativePath: relative, selectionRoot: sel.relativePath)
+                                else {
+                                    return
+                                }
+                                surfacers[sel.importID]?.offer(fileURL: diskURL, filename: filename)
+                            }
+                        )
+                    }
+
+                    for surfacer in surfacers.values {
+                        surfacer.drain()
+                    }
+                    stagedBaseURL = tmpDir
                 } else {
-                    try self.importFolder(
-                        from: sourceURL,
-                        importID: importID,
-                        sourceName: sourceName,
-                        preferredGameRootRelativePath: preferredGameRootRelativePath
-                    )
+                    let folderName = sourceURL.lastPathComponent
+                    let tmpDest = tmpDir.appendingPathComponent(folderName)
+
+                    try ImportSignpost.interval("stage-source", id: batchID) {
+                        do {
+                            try fm.moveItem(at: sourceURL, to: tmpDest)
+                        } catch {
+                            try fm.copyItem(at: sourceURL, to: tmpDest)
+                        }
+                    }
+
+                    try ImportSignpost.interval("validate", id: batchID) {
+                        try GameImportValidator.validate(tmpDest)
+                    }
+                    checkCancellations()
+                    guard !active.isEmpty else {
+                        await MainActor.run { completion(failures) }
+                        return
+                    }
+
+                    for sel in active {
+                        let container = GameContainer(
+                            id: sel.importID,
+                            slug: GameContainer.slugify(sel.displayName)
+                        )
+                        containers[sel.importID] = container
+
+                        let root: URL
+                        do {
+                            root = try resolveRoot(in: tmpDest, relativePath: sel.relativePath)
+                        } catch {
+                            failSelection(sel, error)
+                            continue
+                        }
+
+                        var artworkPath = GameCatalog.findFolderImportArtwork(at: root)
+                        if artworkPath == nil {
+                            artworkPath = writeProbeIconSidecar(sel.iconPNG, to: container)
+                        }
+                        if let path = artworkPath {
+                            _ = ImageCache.shared.image(for: path)
+                        }
+                        self.commitPendingToCard(
+                            sel.importID,
+                            container: container,
+                            title: sel.displayName,
+                            artworkPath: artworkPath
+                        )
+                        self.updateCardProgress(sel.importID, 0.5)
+                    }
+                    stagedBaseURL = tmpDest
                 }
-                markNotInFlight()
-                await MainActor.run {
-                    GameLibrary.shared.reload()
-                    completion(nil)
+
+                checkCancellations()
+                let moveOrder = active.sorted {
+                    $0.relativePath.split(separator: "/").count
+                        > $1.relativePath.split(separator: "/").count
                 }
+
+                for sel in moveOrder {
+                    checkCancellations()
+                    guard active.contains(where: { $0.importID == sel.importID }) else { continue }
+                    guard let container = containers[sel.importID] else { continue }
+
+                    var committed = false
+                    defer {
+                        if !committed {
+                            try? container.deleteAll()
+                        }
+                    }
+
+                    let gameRoot: URL
+                    do {
+                        gameRoot = try resolveRoot(in: stagedBaseURL, relativePath: sel.relativePath)
+                    } catch {
+                        failSelection(sel, error)
+                        continue
+                    }
+
+                    let jgpBundle: Jgp.Bundle?
+                    if sourceURL.pathExtension.lowercased() == "jgp" {
+                        do {
+                            jgpBundle = try GameImporter.preprocessJgp(at: gameRoot)
+                        } catch {
+                            failSelection(sel, error)
+                            continue
+                        }
+                    } else {
+                        jgpBundle = nil
+                    }
+
+                    do {
+                        try ImportSignpost.interval("move", id: sel.importID) {
+                            try fm.createDirectory(
+                                at: container.url,
+                                withIntermediateDirectories: true
+                            )
+                            try fm.moveItem(at: gameRoot, to: container.gameURL)
+                            GameContainer.normalizeImportedGamePermissions(at: container.gameURL)
+                        }
+                    } catch {
+                        let surfaced: Error = Self.isOutOfSpace(error) ? ImportError.outOfSpace : error
+                        failSelection(sel, surfaced)
+                        continue
+                    }
+
+                    if self.isImportCancelled(sel.importID) {
+                        failSelection(sel, ImportCancelled())
+                        continue
+                    }
+
+                    self.updateCardProgress(sel.importID, 0.97)
+
+                    ImportSignpost.interval("finalize", id: sel.importID) {
+                        if let bundle = jgpBundle {
+                            GameImporter.finalizeJgpImport(container: container, bundle: bundle)
+                        } else if isArchive {
+                            if !fm.fileExists(atPath: container.exeIconSidecarURL.path) {
+                                _ = ExecutableIconExtractor.writeSidecarIfPossible(in: container)
+                            }
+                            GameImporter.createMetadata(in: container)
+                        } else {
+                            _ = ExecutableIconExtractor.writeSidecarIfPossible(in: container)
+                            GameImporter.seedFolderImport(in: container)
+                        }
+                    }
+
+                    committed = true
+                    self.inFlightImports.withLock { _ = $0.remove(sel.importID) }
+                    active.removeAll { $0.importID == sel.importID }
+                    self.updateCardProgress(sel.importID, 1.0)
+
+                    await MainActor.run {
+                        GameLibrary.shared.mergeImportedGame(container: container)
+                    }
+                }
+
+                await MainActor.run { completion(failures) }
             } catch is ImportCancelled {
-                markNotInFlight()
-                NSLog("[GameLibrary] Import cancelled: %@", importID)
-                await MainActor.run {
-                    GameLibrary.shared.abandonImport(importID: importID, container: nil)
-                    completion(ImportCancelled())
-                }
+                failAllActive(ImportCancelled())
+                await MainActor.run { completion(failures) }
+            } catch ArchiveExtractor.Error.cancelled {
+                failAllActive(ImportCancelled())
+                await MainActor.run { completion(failures) }
             } catch {
-                markNotInFlight()
-                NSLog("[GameLibrary] Import error: %@", "\(error)")
                 let surfaced: Error = Self.isOutOfSpace(error) ? ImportError.outOfSpace : error
-                await MainActor.run {
-                    GameLibrary.shared.abandonImport(importID: importID, container: nil)
-                    completion(surfaced)
+                failAllActive(surfaced)
+                await MainActor.run { completion(failures) }
+            }
+        }
+    }
+
+    nonisolated private static func matchingSelection(
+        for relativePath: String,
+        in active: [GameLibrary.BatchSelection]
+    ) -> GameLibrary.BatchSelection? {
+        let normalized = relativePath.replacingOccurrences(of: "\\", with: "/").lowercased()
+        var best: GameLibrary.BatchSelection?
+        var bestDepth = -1
+        for sel in active {
+            let root = sel.relativePath.replacingOccurrences(of: "\\", with: "/").lowercased()
+            if root.isEmpty {
+                if bestDepth < 0 {
+                    best = sel
+                    bestDepth = 0
+                }
+                continue
+            }
+            if normalized == root || normalized.hasPrefix(root + "/") {
+                let depth = root.split(separator: "/").count
+                if depth > bestDepth {
+                    best = sel
+                    bestDepth = depth
                 }
             }
         }
+        return best
+    }
+
+    nonisolated private static func isRootLevelExe(relativePath: String, selectionRoot: String) -> Bool {
+        let normalized = relativePath.replacingOccurrences(of: "\\", with: "/").lowercased()
+        guard normalized.hasSuffix(".exe") else { return false }
+        let root = selectionRoot.replacingOccurrences(of: "\\", with: "/").lowercased()
+        let prefix = root.isEmpty ? "" : root + "/"
+        guard root.isEmpty || normalized.hasPrefix(prefix) else { return false }
+        let suffix =
+            root.isEmpty
+            ? normalized
+            : String(normalized.dropFirst(prefix.count))
+        let depth = suffix.split(separator: "/", omittingEmptySubsequences: false).count - 1
+        return depth >= 0 && depth <= 1
     }
 
     /// Commits a progress-card `GameEntry` to `games` and drops the
@@ -680,280 +934,6 @@ extension GameLibrary {
                 status: .importing(progress: progress)
             )
         }
-    }
-
-    nonisolated func importFolder(
-        from sourceURL: URL,
-        importID: String,
-        sourceName: String,
-        preferredGameRootRelativePath: String?
-    ) throws {
-        let fm = FileManager.default
-        let folderName = sourceURL.lastPathComponent
-
-        let tmpDir = try ImportTemporaryDirectory.makeScopedDirectory(kind: .folderImport, fm: fm)
-        let tmpDest = tmpDir.appendingPathComponent(folderName)
-        defer { try? fm.removeItem(at: tmpDir) }
-
-        // Pre-flight: copy once into tmp (cheaper than moving the
-        // source and having no rollback if validation fails) and
-        // validate the copy. This is the only "Validating" phase
-        // the user sees on the button.
-        try fm.copyItem(at: sourceURL, to: tmpDest)
-        guard !isImportCancelled(importID) else { throw ImportCancelled() }
-
-        let gameRoot = try {
-            try GameImportValidator.validate(tmpDest)
-            if let preferredGameRootRelativePath {
-                return try GameImportValidator.resolveGameRoot(
-                    in: tmpDest,
-                    relativePath: preferredGameRootRelativePath
-                )
-            }
-            return GameImportValidator.locateGameRoot(in: tmpDest) ?? tmpDest
-        }()
-        guard !isImportCancelled(importID) else { throw ImportCancelled() }
-
-        // Pre-flight passed - commit the progress card so the rest
-        // of the import has a visible home for progress/cancel UI.
-        let title = GameINI.parseINIValue(at: gameRoot, section: "game", key: "title") ?? sourceName
-        let container = GameContainer(id: importID, slug: GameContainer.slugify(title))
-
-        // Lazy: write the exe-icon sidecar into Metadata/ from the
-        // tmp tree before the move, so the committed card has
-        // something to display. ExecutableIconExtractor's static
-        // helper is keyed off a game-folder URL; pass the tmp
-        // location, then re-target the resulting sidecar path
-        // afterwards. (For folder imports, sidecars are uncommon
-        // because folder imports are usually pre-extracted RGSS
-        // trees with `Graphics/Titles/` already present.)
-        let artworkPath = GameCatalog.findFolderImportArtwork(at: gameRoot)
-        if let path = artworkPath {
-            // Warm the decode cache before `tmpDest`'s defer-backed
-            // cleanup kicks in so the card keeps rendering the
-            // artwork across the move-then-reload window.
-            _ = ImageCache.shared.image(for: path)
-        }
-        commitPendingToCard(
-            importID, container: container,
-            title: title, artworkPath: artworkPath)
-
-        // Folder imports don't have a meaningful extraction-progress
-        // phase (the heavy copy already happened in the pre-flight).
-        // Jump directly to the move; if the card gets cancelled in
-        // the brief window before the move finishes, the cancel
-        // path below cleans up.
-        updateCardProgress(importID, 1.0)
-
-        var committed = false
-        defer {
-            if !committed {
-                try? container.deleteAll()
-            }
-        }
-
-        try fm.createDirectory(at: container.url, withIntermediateDirectories: true)
-        try fm.moveItem(at: gameRoot, to: container.gameURL)
-        GameContainer.normalizeImportedGamePermissions(at: container.gameURL)
-
-        if isImportCancelled(importID) { throw ImportCancelled() }
-
-        // Lazy: extract the exe-icon sidecar from the now-final
-        // location, writing into Metadata/. Idempotent (skipped if
-        // already present), so repeat imports are cheap.
-        _ = ExecutableIconExtractor.writeSidecarIfPossible(in: container)
-
-        GameImporter.seedFolderImport(in: container)
-        committed = true
-    }
-
-    nonisolated func importArchive(
-        from sourceURL: URL,
-        importID: String,
-        sourceName: String,
-        preferredGameRootRelativePath: String?
-    ) throws {
-        let fm = FileManager.default
-
-        // Pre-flight scratch: throwaway dir for selectively
-        // extracting just the validation files. Lives only for the
-        // length of the pre-flight phase.
-        let preflightDir = try ImportTemporaryDirectory.makeScopedDirectory(
-            kind: .archivePreflight,
-            fm: fm
-        )
-        defer { try? fm.removeItem(at: preflightDir) }
-
-        let preflightRoot: URL
-        do {
-            preflightRoot = try GameImportValidator.preflightArchive(
-                at: sourceURL,
-                scratchDir: preflightDir,
-                preferredGameRootRelativePath: preferredGameRootRelativePath,
-                shouldCancel: { self.isImportCancelled(importID) }
-            )
-        } catch ArchiveExtractor.Error.cancelled {
-            throw ImportCancelled()
-        }
-        guard !isImportCancelled(importID) else { throw ImportCancelled() }
-
-        // Pre-flight passed - pick up the title from the extracted
-        // `.ini` so the committed card shows the real name while the
-        // rest of the archive extracts in the background. Artwork
-        // fills in mid-extract via the extract() callback below.
-        let title = GameINI.parseINIValue(at: preflightRoot, section: "game", key: "title") ?? sourceName
-        let container = GameContainer(id: importID, slug: GameContainer.slugify(title))
-        commitPendingToCard(
-            importID, container: container,
-            title: title, artworkPath: nil)
-
-        var committed = false
-        defer {
-            if !committed {
-                try? container.deleteAll()
-            }
-        }
-
-        // Full extraction now runs visibly - progress feeds the
-        // committed card's `.importing(progress:)` status.
-        let tmpDir = try ImportTemporaryDirectory.makeScopedDirectory(kind: .archiveImport, fm: fm)
-        defer { try? fm.removeItem(at: tmpDir) }
-
-        // Mid-extract artwork surfacing - .exe icon ONLY.
-        //
-        // Earlier this also surfaced `Graphics/Titles/*` images as
-        // a fallback when no `.exe` had landed yet. That produced
-        // a visible artwork flash for games whose archive ordering
-        // happened to put title images before the executable
-        // (Reborn1950.zip is one such): mid-import would show the
-        // title screen, then late-extract or post-import reload
-        // would replace it with the `.exe` icon that
-        // `findArtwork` picks. The two-stage surface
-        // never matched what the user would see post-import, so
-        // we just don't surface the titles fallback during
-        // extract anymore. Games without a usable `.exe` keep
-        // the placeholder during import and transition once at
-        // reload (placeholder -> title screen). Games with an
-        // `.exe` still surface the icon as soon as the `.exe`
-        // entry is processed, and that surface matches what the
-        // post-import scan picks - one transition, no flash.
-        //
-        // `Game.exe` is the canonical RPG Maker default and wins
-        // outright when present; other qualifying `.exe`s set a
-        // tentative sidecar that `Game.exe` can still overwrite
-        // if it arrives later in archive order. Utility binaries
-        // (patchers, launchers, unins000.exe, etc.) are skipped
-        // wholesale via the keyword blocklist.
-        //
-        // Sidecar lives at `<container>/Metadata/exe-icon.png`,
-        // not inside `Game/`, so the imported game tree stays
-        // untouched and the file survives the tmp->destination
-        // move unchanged.
-        let exeArtworkLocked = Mutex(false)
-        let hasTentativeExeArtwork = Mutex(false)
-        do {
-            try ArchiveExtractor.extract(
-                archive: sourceURL,
-                to: tmpDir,
-                shouldCancel: { self.isImportCancelled(importID) },
-                progress: { _, pct in
-                    self.updateCardProgress(importID, pct)
-                },
-                onFileWritten: { relative, diskURL in
-                    let lower = relative.lowercased()
-                    let filename = (relative as NSString).lastPathComponent
-
-                    // Only react to root-level executables (depth
-                    // 0 or 1, matching the archive's optional
-                    // wrapper folder).
-                    guard lower.hasSuffix(".exe") else { return }
-                    let components = lower.split(separator: "/", omittingEmptySubsequences: false)
-                    let depth = components.count - 1
-                    guard depth <= 1 else { return }
-                    if exeArtworkLocked.withLock({ $0 }) { return }
-
-                    let isGameExe = filename.lowercased() == "game.exe"
-                    if !isGameExe, ExecutableIconExtractor.isUtilityExecutable(filename: filename) {
-                        return
-                    }
-                    // Non-canonical binaries defer to any
-                    // previously-written tentative sidecar; only
-                    // `Game.exe` overwrites.
-                    if !isGameExe, hasTentativeExeArtwork.withLock({ $0 }) { return }
-
-                    guard let data = try? Data(contentsOf: diskURL, options: .mappedIfSafe) else {
-                        return
-                    }
-                    guard let pe = PEImage(data: data),
-                        let image = pe.extractIcon(),
-                        let png = image.pngData()
-                    else {
-                        return
-                    }
-
-                    container.ensureMetadataDirectory()
-                    let sidecarURL = container.exeIconSidecarURL
-                    do {
-                        try png.write(to: sidecarURL)
-                    } catch {
-                        NSLog("[GameLibrary] Sidecar write failed: %@", "\(error)")
-                        return
-                    }
-                    ImageCache.shared.evict(path: sidecarURL.path)
-                    _ = ImageCache.shared.image(for: sidecarURL.path)
-
-                    hasTentativeExeArtwork.withLock { $0 = true }
-                    if isGameExe {
-                        exeArtworkLocked.withLock { $0 = true }
-                    }
-                    self.updateCardArtwork(importID, artworkPath: sidecarURL.path)
-                }
-            )
-        } catch ArchiveExtractor.Error.cancelled {
-            throw ImportCancelled()
-        }
-        guard !isImportCancelled(importID) else { throw ImportCancelled() }
-
-        let gameRoot = try {
-            if let preferredGameRootRelativePath {
-                return try GameImportValidator.resolveGameRoot(
-                    in: tmpDir,
-                    relativePath: preferredGameRootRelativePath
-                )
-            }
-            return GameImportValidator.locateGameRoot(in: tmpDir) ?? GameContainer.findGameRoot(in: tmpDir)
-        }()
-
-        // JGP post-processing: if the archive was a JoiPlay .jgp,
-        // parse manifest/configuration/gamepad, reject unsupported
-        // runtimes, strip the JGP-specific files from the game
-        // folder so they don't ship next to the engine files, and
-        // keep a `JgpImport` bundle so we can seed metadata +
-        // settings after the final move. Regular .zip imports skip
-        // this branch entirely.
-        let jgpBundle: Jgp.Bundle? =
-            sourceURL.pathExtension.lowercased() == "jgp"
-            ? try GameImporter.preprocessJgp(at: gameRoot)
-            : nil
-
-        // Move the extracted tree into <container>/Game/. The
-        // exe-icon sidecar (if written above) already lives at
-        // <container>/Metadata/exe-icon.png and survives this move
-        // unchanged because Metadata/ is a sibling of Game/.
-        try fm.createDirectory(at: container.url, withIntermediateDirectories: true)
-        try fm.moveItem(at: gameRoot, to: container.gameURL)
-        GameContainer.normalizeImportedGamePermissions(at: container.gameURL)
-
-        if isImportCancelled(importID) { throw ImportCancelled() }
-        if let bundle = jgpBundle {
-            GameImporter.finalizeJgpImport(
-                container: container,
-                bundle: bundle
-            )
-        } else {
-            GameImporter.createMetadata(in: container)
-        }
-        committed = true
     }
 
     func deleteGame(_ entry: GameEntry, onError: (@MainActor @Sendable (String) -> Void)? = nil) {

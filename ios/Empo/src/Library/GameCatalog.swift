@@ -15,10 +15,22 @@ enum GameCatalog {
         for container in GameContainer.discover() {
             if skipIDs.contains(container.id) { continue }
 
+            // A container without a `Game/` subdirectory never finished
+            // importing (e.g. the app was killed mid-extract, leaving only
+            // the `Metadata/` sidecar dir behind). It can't become a real
+            // game, so drop it instead of surfacing an "Unknown Game" card.
+            // Live imports are excluded via `skipIDs` above, so anything
+            // reaching here with no `Game/` is a genuine orphan.
             let gameDirExists = fm.fileExists(atPath: container.gameURL.path)
-            let isValid =
-                gameDirExists
-                && (try? GameImportValidator.validate(container.gameURL)) != nil
+            if !gameDirExists {
+                NSLog(
+                    "[GameCatalog] Removing incomplete import container: %@",
+                    container.folderName)
+                try? container.deleteAll()
+                continue
+            }
+
+            let isValid = (try? GameImportValidator.validate(container.gameURL)) != nil
 
             if !isValid {
                 if cleanupInvalid {
