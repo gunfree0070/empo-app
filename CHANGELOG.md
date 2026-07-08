@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.2.7 - 2026-07-08
+
+### Bug Fixes
+
+- Avoid SIGPIPE in audit-ipa GitInfo grep ([`c92c9c5`](https://github.com/mateo-m/empo-app/commit/c92c9c55fe80bd0b5d3ac967b1acfba5d7535c90))
+- Adopt UIScene lifecycle for iOS 27 SDK ([`41d93fd`](https://github.com/mateo-m/empo-app/commit/41d93fdf577049877e22a0dd5bcc0734489011e6))
+- Restore game rendering and Insurgence cheats after UIScene migration ([`964a9d3`](https://github.com/mateo-m/empo-app/commit/964a9d3ad06d5c1bee7b2be205b31df71ed02229))
+- Apply SDL iOS fixes via build-time patches ([`d50670b`](https://github.com/mateo-m/empo-app/commit/d50670bfdd7171892fcc93ecb266dfc1b79997b9))
+- Info-alert UX for game msgbox and guard stale mkxp merges ([`5aeacc9`](https://github.com/mateo-m/empo-app/commit/5aeacc96c6cb91e1c7085bbe60ad86c0cef73649))
+- Block RTP-dependent games and fix spaced Game.ini keys ([`da4b493`](https://github.com/mateo-m/empo-app/commit/da4b493a698d7f618efe5dd289b800bc9f3e86f5))
+- Block RTP-dependent games and fix spaced Game.ini keys ([`d877c75`](https://github.com/mateo-m/empo-app/commit/d877c7517cc3eb369d3493a0b0c560c594694e16))
+
+### Chores
+
+- Run mkxp-z rubocop in pre-push (#75) ([`8c224fa`](https://github.com/mateo-m/empo-app/commit/8c224fa3755f37fcc66dbf90746b9e8b7c5cf529))
+- Gitignore Empo derived data directory ([`c57a9ae`](https://github.com/mateo-m/empo-app/commit/c57a9ae269b481cf2fea90ae8190d784d6224f7c))
+- Bump mkxp-z submodule ([`aca579e`](https://github.com/mateo-m/empo-app/commit/aca579e2ff1048a0a3ba81f60c9da6e35a5381b2))
+- Bump mkxp-z submodule ([`8dcae40`](https://github.com/mateo-m/empo-app/commit/8dcae406a2369df130007ff9d85dae522d45c0bc))
+- Bump mkxp-z submodule ([`d82f2f5`](https://github.com/mateo-m/empo-app/commit/d82f2f530c1bf2f762a004f5d943e5f0f809ec4e))
+- Bump mkxp-z submodule ([`99379f8`](https://github.com/mateo-m/empo-app/commit/99379f8809d5d4ba851611c7c77f0c1c50064c80))
+- Publish shared git hooks and align submodule setup ([`8555a0f`](https://github.com/mateo-m/empo-app/commit/8555a0f8e4de5f7c7e3fe87e5d8b7ad749d2a037))
+- Keep commit-message and co-author policy local-only ([`b408925`](https://github.com/mateo-m/empo-app/commit/b408925b1e4ef2a89ca18c08207bbcb1c99712ba))
+- Drop local override mention from gitignore ([`4b62bd3`](https://github.com/mateo-m/empo-app/commit/4b62bd3a54442a49abd8b71993d9ef9b67891f01))
+
+### Performance
+
+- Overhaul game import pipeline for speed and correctness ([`2672bd6`](https://github.com/mateo-m/empo-app/commit/2672bd6fcc2f178d167962f9aaefd334cfc75495))
+
+### Refactor
+
+- Wire GameProbe package into Host (#76) ([`02fc08e`](https://github.com/mateo-m/empo-app/commit/02fc08e211950a3994ee45f3f10495084a49fcad))
+- Extract EngineSessionCoordinator from AppState (#83) ([`86f3cda`](https://github.com/mateo-m/empo-app/commit/86f3cda0b9dd5959485367b1c9dd3c3f1fae7f44))
+- Merge import orchestration into ImportPipeline (#78) ([`21b88ba`](https://github.com/mateo-m/empo-app/commit/21b88ba4935cc343c600658c70658367ebbd8c6f))
+- Finish library, config projector, and input routing stack (#85) ([`eb538bc`](https://github.com/mateo-m/empo-app/commit/eb538bc952c0b8b7dd1cc73d5c3fede9ad04650f))
+
 ## 0.2.6 - 2026-06-22
 
 ### Bug Fixes
