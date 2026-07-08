@@ -23,6 +23,15 @@
       ],
       "versions": [
         {
+          "version": "0.2.8",
+          "buildVersion": "415",
+          "date": "2026-07-08",
+          "localizedDescription": "### Bug Fixes\n\n- Embed SDL view and restore play controls ([`7303900`](https://github.com/mateo-m/empo-app/commit/7303900642903f01b5793575e599c9a47ab5df89))",
+          "downloadURL": "https://github.com/mateo-m/empo-app/releases/download/v0.2.8/Empo-0.2.8-unsigned.ipa",
+          "size": 16397693,
+          "minOSVersion": "26.0"
+        },
+        {
           "version": "0.2.7",
           "buildVersion": "412",
           "date": "2026-07-08",
