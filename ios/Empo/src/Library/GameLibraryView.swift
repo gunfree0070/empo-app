@@ -34,8 +34,8 @@ struct GameLibraryView: View {
     @State private var gameForInfo: GameEntry?
     @State private var pendingGame: GameEntry?
     @State private var showPausedGameAlert = false
-    @State private var rtpBlockedGame: GameEntry?
-    @State private var rtpBlockedRequirement: GameRTPRequirement?
+    @State private var rtpWarnedGame: GameEntry?
+    @State private var rtpWarnedRequirement: GameRTPRequirement?
     @State private var showRTPRequiredAlert = false
     @State private var staggerTrigger = UUID()
     @State private var entranceDelay: TimeInterval = 0.15
@@ -189,14 +189,15 @@ struct GameLibraryView: View {
                     showCancelValidationAlert: $showCancelValidationAlert,
                     showPausedGameAlert: $showPausedGameAlert,
                     showRTPRequiredAlert: $showRTPRequiredAlert,
-                    rtpBlockedGame: rtpBlockedGame,
-                    rtpBlockedRequirement: rtpBlockedRequirement,
+                    rtpWarnedGame: rtpWarnedGame,
+                    rtpWarnedRequirement: rtpWarnedRequirement,
                     importPipelineAlert: importPipelineAlertBinding,
                     pausedGame: pauseManager.pausedGame,
                     onDeleteGame: deleteSelectedGame,
                     onDismissImportPipelineAlert: importPipeline.dismissAlert,
                     onCancelValidation: importPipeline.cancelValidation,
-                    onDismissPausedGameAlert: { pendingGame = nil }
+                    onDismissPausedGameAlert: { pendingGame = nil },
+                    onContinueDespiteRTP: continueDespiteRTPWarning
                 )
             )
             .toolbarVisibility(.hidden, for: .navigationBar)
@@ -845,16 +846,24 @@ struct GameLibraryView: View {
             pendingGame = game
             showPausedGameAlert = true
         } else if let container = game.container,
-            AppState.blocksRTPDependentLaunch(for: container),
+            AppState.needsRTPLaunchWarning(for: container),
             let requirement = GameRTPRequirement.detect(at: container.gameURL)
         {
-            rtpBlockedGame = game
-            rtpBlockedRequirement = requirement
+            rtpWarnedGame = game
+            rtpWarnedRequirement = requirement
             showRTPRequiredAlert = true
         } else {
             appState.selectGame(game)
             path.append(game)
         }
+    }
+
+    private func continueDespiteRTPWarning() {
+        guard let game = rtpWarnedGame else { return }
+        rtpWarnedGame = nil
+        rtpWarnedRequirement = nil
+        appState.selectGame(game)
+        path.append(game)
     }
 
     private func refreshGameSizes() {
@@ -1006,14 +1015,15 @@ private struct LibraryAlertPresentation: ViewModifier {
     @Binding var showCancelValidationAlert: Bool
     @Binding var showPausedGameAlert: Bool
     @Binding var showRTPRequiredAlert: Bool
-    let rtpBlockedGame: GameEntry?
-    let rtpBlockedRequirement: GameRTPRequirement?
+    let rtpWarnedGame: GameEntry?
+    let rtpWarnedRequirement: GameRTPRequirement?
     @Binding var importPipelineAlert: ImportPipelineAlert?
     let pausedGame: GameEntry?
     let onDeleteGame: () -> Void
     let onDismissImportPipelineAlert: () -> Void
     let onCancelValidation: () -> Void
     let onDismissPausedGameAlert: () -> Void
+    let onContinueDespiteRTP: () -> Void
 
     func body(content: Content) -> some View {
         content
@@ -1046,17 +1056,20 @@ private struct LibraryAlertPresentation: ViewModifier {
                 Text("This game couldn't be loaded properly. You can delete it and try importing again.")
             }
             .alert("Run-Time Package Required", isPresented: $showRTPRequiredAlert) {
-                Button("OK", role: .cancel) {}
+                Button("Cancel", role: .cancel) {}
+                Button("Continue") {
+                    onContinueDespiteRTP()
+                }
             } message: {
-                if let game = rtpBlockedGame, let requirement = rtpBlockedRequirement {
+                if let game = rtpWarnedGame, let requirement = rtpWarnedRequirement {
                     Text(
                         """
                         "\(game.title)" needs shared RPG Maker assets from \
                         \(requirement.friendlySummary) (\(requirement.summary)). \
                         These Run-Time Packages are not bundled with the game.
 
-                        Empo cannot load Run-Time Packages yet, so this game \
-                        cannot be played.
+                        Empo cannot load Run-Time Packages yet, so the game \
+                        may fail to start or be missing graphics and audio.
                         """
                     )
                 }
