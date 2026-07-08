@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.9 - 2026-07-08
+
+### Bug Fixes
+
+- Allow continuing past RTP launch warning ([`5c941a4`](https://github.com/mateo-m/empo-app/commit/5c941a45dd2a1f15f2bfa5f46b1be0633236517e))
+
 ## 0.2.8 - 2026-07-08
 
 ### Bug Fixes
