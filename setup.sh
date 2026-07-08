@@ -19,12 +19,18 @@ fi
 echo "Git hooks configured."
 
 echo "Verifying required hook tools..."
-for tool in swift-format swiftlint clang-format bun shfmt shellcheck; do
+. "$REPO_ROOT/scripts/hooks/ruby-env.sh"
+for tool in swift-format swiftlint clang-format bun shfmt shellcheck bundle; do
     if ! command -v "$tool" >/dev/null 2>&1; then
         echo "Missing required tool: $tool" >&2
         exit 1
     fi
 done
 echo "All required hook tools are installed."
+
+if [ -f "$REPO_ROOT/mkxp-z-apple-mobile/Gemfile" ]; then
+    echo "Installing mkxp-z Ruby lint deps..."
+    (cd "$REPO_ROOT/mkxp-z-apple-mobile" && bundle install)
+fi
 
 echo "Done."

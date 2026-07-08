@@ -48,6 +48,8 @@ if ! git -C "$SUBMODULE_PATH" merge-base --is-ancestor "$SUBMODULE_SHA" "origin/
     exit 1
 fi
 
+. "$REPO_ROOT/scripts/hooks/ruby-env.sh"
+
 if ! command -v bundle >/dev/null 2>&1; then
     printf 'pre-push failed: bundle is required to lint %s compat scripts\n' "$SUBMODULE_PATH" >&2
     exit 1
