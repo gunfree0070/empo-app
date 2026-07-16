@@ -23,6 +23,15 @@
       ],
       "versions": [
         {
+          "version": "0.2.11",
+          "buildVersion": "431",
+          "date": "2026-07-16",
+          "localizedDescription": "### Chores\n\n- Pin native-2026-07-16-r3 with JoiPlay-compat toggle engine ([`afa2a67`](https://github.com/mateo-m/empo-app/commit/afa2a67e461d1792ced8d59c09201837130dc061))\n\n### Features\n\n- Per-game JoiPlay compatibility toggle in Game Settings, default off ([`7691ebf`](https://github.com/mateo-m/empo-app/commit/7691ebf9bcf3faca0de2898f58394df1dc2374de))",
+          "downloadURL": "https://github.com/mateo-m/empo-app/releases/download/v0.2.11/Empo-0.2.11-unsigned.ipa",
+          "size": 16453813,
+          "minOSVersion": "26.0"
+        },
+        {
           "version": "0.2.10",
           "buildVersion": "427",
           "date": "2026-07-16",
