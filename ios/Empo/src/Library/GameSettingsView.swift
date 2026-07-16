@@ -439,6 +439,13 @@ struct GameSettingsView: View {
                     "Use the game's built-in keyboard scene for name entry instead of the iOS soft keyboard. Enable for Pokemon Essentials games whose keyboard layout has custom keys."
             )
 
+            SettingsToggle(
+                title: "JoiPlay compatibility",
+                isOn: joiplayCompatBinding,
+                description:
+                    "Tell the game it's running on JoiPlay ($joiplay). Some games then use mobile-friendly code paths, but games patched for JoiPlay's older engine may misbehave. Enable if the game errors on features its desktop version reserves for PC."
+            )
+
             VStack(alignment: .leading, spacing: Spacing.xs) {
                 Picker("Ruby version", selection: rubyVersionBinding) {
                     Text(autoDetectLabel).tag(RubyVersionPick.auto)
@@ -605,6 +612,13 @@ struct GameSettingsView: View {
         Binding(
             get: { settings.useInGameKeyboard ?? isPokemonEssentialsDefault },
             set: { settings.useInGameKeyboard = $0 }
+        )
+    }
+
+    private var joiplayCompatBinding: Binding<Bool> {
+        Binding(
+            get: { settings.joiplayCompat ?? false },
+            set: { settings.joiplayCompat = $0 }
         )
     }
 

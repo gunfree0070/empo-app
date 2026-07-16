@@ -228,6 +228,15 @@ struct GameSettings: Codable, Equatable {
     /// to `pokemon_input.rb`'s `USEKEYBOARDTEXTENTRY = false` override.
     @Setting<Bool?, RuntimeFlag> var useInGameKeyboard: Bool?
 
+    /// Make game scripts see `$joiplay = true` so they take their
+    /// JoiPlay-specific code paths (mobile-friendly API calls, but
+    /// also patches written against JoiPlay's old mkxp fork that can
+    /// misbehave on our engine). Default off. Routes through
+    /// `MKXPSessionConfig.joiplayCompat` to `platform_compat.rb`,
+    /// which sets the global before game scripts load - hence
+    /// restart-required.
+    @Setting<Bool?, RestartFlag> var joiplayCompat: Bool?
+
     private static let settingsFilename = "game_settings.json"
 
     /// Read the game's settings sidecar from `<container>/EmpoState/`
@@ -314,6 +323,8 @@ struct GameSettings: Codable, Equatable {
         case "solidFonts": return "Solid fonts"
         case "postloadScripts": return "Postload scripts"
         case "useModernRuby": return "Ruby compatibility mode"
+        case "rubyVersionOverride": return "Ruby version"
+        case "joiplayCompat": return "JoiPlay compatibility"
         default:
             // Surface the raw camelCase name so the missing mapping
             // is visible in the UI rather than silently dropped.

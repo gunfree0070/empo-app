@@ -62,6 +62,7 @@ enum GameSession {
                 config.verticalAlignment = alignment.bridgeValue
                 config.postloadEnabled = postload
                 config.useInGameKeyboard = settings.useInGameKeyboard ?? inGameKeyboardDefault
+                config.joiplayCompat = settings.joiplayCompat ?? false
                 mkxp_applySessionConfig(&config)
             }
         }
