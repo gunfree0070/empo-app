@@ -49,6 +49,9 @@ final class EngineSessionCoordinator {
         sessionLogger.onPlayTimeFlushed = { gameID in
             GameLibrary.shared.refreshGameEntry(id: gameID)
         }
+        // Game scripts see `$userAgent = "empo"` and `$empo = true`,
+        // alongside the engine's JoiPlay-compat `$joiplay`.
+        mkxp_setLauncherIdentity("empo")
         registerBridgeCallbacks()
         installInputBridgesIfNeeded()
     }
