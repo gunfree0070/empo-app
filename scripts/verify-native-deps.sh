@@ -99,12 +99,19 @@ if [[ -f "$FINGERPRINT_FILE" ]]; then
 sources changed since mkxp*-merged.o was built. Rebuild with: \
 cd ios/Dependencies && make -f ${PLATFORM}.make mkxp-merged"
     fi
+elif [[ "${EMPO_ALLOW_UNSTAMPED:-0}" == "1" ]]; then
+    echo "warning: $FINGERPRINT_FILE missing; staleness check skipped (EMPO_ALLOW_UNSTAMPED=1)" >&2
 else
-    # Trees built before the fingerprint existed (or old prebuilt
-    # tarballs) lack the stamp. Warn instead of failing so they keep
-    # building; the stamp appears on the next mkxp-merged rebuild.
-    echo "warning: $FINGERPRINT_FILE missing; cannot check mkxp*-merged.o staleness" >&2
-    echo "warning: rebuild once to enable the guard: cd ios/Dependencies && make -f ${PLATFORM}.make mkxp-merged" >&2
+    # Every supported tree carries the stamp as of native-2026-07-16
+    # (make mkxp-merged writes it; the published tarball includes it).
+    # A missing stamp means an ancient tree whose merged objects cannot
+    # be trusted — this is exactly how the stale-msgbox bug shipped, so
+    # fail instead of warning. EMPO_ALLOW_UNSTAMPED=1 overrides for
+    # archaeology on pre-stamp trees.
+    fail "$FINGERPRINT_FILE missing: cannot prove mkxp*-merged.o match the binding \
+sources. Rebuild with: cd ios/Dependencies && make -f ${PLATFORM}.make mkxp-merged \
+(or re-hydrate: rm -rf ios/Dependencies/build-* ios/Dependencies/native/.fetched-version, \
+then build). Set EMPO_ALLOW_UNSTAMPED=1 to bypass."
 fi
 
 echo "OK: $PLATFORM native dependency artifacts look healthy"
