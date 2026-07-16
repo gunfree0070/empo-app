@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.11 - 2026-07-16
+
+### Chores
+
+- Pin native-2026-07-16-r3 with JoiPlay-compat toggle engine ([`afa2a67`](https://github.com/mateo-m/empo-app/commit/afa2a67e461d1792ced8d59c09201837130dc061))
+
+### Features
+
+- Per-game JoiPlay compatibility toggle in Game Settings, default off ([`7691ebf`](https://github.com/mateo-m/empo-app/commit/7691ebf9bcf3faca0de2898f58394df1dc2374de))
+
 ## 0.2.10 - 2026-07-16
 
 ### Bug Fixes
