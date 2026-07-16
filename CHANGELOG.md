@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.2.10 - 2026-07-16
+
+### Bug Fixes
+
+- Cover Dir.each_child in save-path remap ([`c45ad1a`](https://github.com/mateo-m/empo-app/commit/c45ad1a54cc7df52ebe6c75a6ca38f62f40ecd80))
+- Survive game-requested exit instead of aborting on shutdown ([`a637bc4`](https://github.com/mateo-m/empo-app/commit/a637bc446cc919dd8afb29e195d42b65a3cbc194))
+
+### Chores
+
+- Pin native-2026-07-16 and require binding fingerprint stamp ([`c146710`](https://github.com/mateo-m/empo-app/commit/c1467103f0033902f1ab5270cf2b70912c612316))
+- Pin native-2026-07-16-r2 with clean-exit engine fixes ([`99f6c38`](https://github.com/mateo-m/empo-app/commit/99f6c38dff85b4134931b981306641745630bc4a))
+
+### Features
+
+- Identify as "empo" to game scripts via launcher identity ([`534d83e`](https://github.com/mateo-m/empo-app/commit/534d83e5102c31ba109d90a1e6d6b0d80853eb6c))
+- Stamp engine binding fingerprint in debug log header ([`e7bb580`](https://github.com/mateo-m/empo-app/commit/e7bb580d06c994b2c3995d3130ac3877a2f12f63))
+- Import self-extracting .exe installers via vendored libmspack ([`ba6d766`](https://github.com/mateo-m/empo-app/commit/ba6d766ab98f2c8e1dbcff2da59f0aa721918b74))
+
 ## 0.2.9 - 2026-07-08
 
 ### Bug Fixes
