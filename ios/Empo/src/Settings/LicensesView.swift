@@ -91,6 +91,18 @@ private let licenses: [LicenseEntry] = [
             """),
 
     LicenseEntry(
+        "libmspack", license: "LGPL 2.1",
+        text: """
+            Copyright (C) 2003-2023 Stuart Caie.
+
+            libmspack is free software; you can redistribute it and/or modify it under the terms of the GNU Lesser General Public License (LGPL) version 2.1, as published by the Free Software Foundation.
+
+            This library is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more details.
+
+            You should have received a copy of the GNU Lesser General Public License along with this library; if not, write to the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA. The full license text is also available at https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html and ships with the source at ios/Empo/vendor/libmspack/COPYING.LIB.
+            """),
+
+    LicenseEntry(
         "libogg", license: "BSD 3-Clause",
         text: """
             Copyright (c) 2002, Xiph.org Foundation

@@ -59,6 +59,9 @@ settings:
       - $(PROJECT_DIR)/../../mkxp-z-apple-mobile/hmode7/src
       - $(PROJECT_DIR)/shims
       - $(PROJECT_DIR)/shims/libarchive
+      # Vendored libmspack (CAB reader for self-extracting .exe game
+      # installers). Its sources use angled includes (<mspack.h>).
+      - $(PROJECT_DIR)/vendor/libmspack
       # Ruby 3.1 headers live under /include/ruby31/ now (Phase D
       # header isolation, MULTI_RUBY_PLAN.md). Keep this AHEAD of
       # the global $(DEPENDENCY_SEARCH_PATH)/include in
@@ -323,6 +326,13 @@ targets:
       - path: ../../mkxp-z-apple-mobile/src/app_bridge.cpp
       - path: ../../mkxp-z-apple-mobile/src/ios_fatal_report.mm
       - path: ../../mkxp-z-apple-mobile/src/angle_native_layer.mm
+      # Vendored libmspack CAB reader (see vendor/libmspack/README.md).
+      # The project-wide HAVE_CONFIG_H (meant for mkxp-z) must not leak
+      # into libmspack, whose sources would otherwise include mkxp-z's
+      # C++ config.h.
+      - path: vendor/libmspack
+        type: group
+        compilerFlags: -UHAVE_CONFIG_H
       - path: src
         type: group
       # Gitignored generated file; listed explicitly so xcodegen keeps

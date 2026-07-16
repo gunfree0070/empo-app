@@ -4,6 +4,10 @@ import UniformTypeIdentifiers
 extension UTType {
     static let sevenZArchive = UTType(filenameExtension: "7z") ?? .archive
     static let rarArchive = UTType(filenameExtension: "rar") ?? .archive
+    /// Self-extracting .exe game installers (CAB/7z/RAR/zip payload
+    /// behind a Windows extractor stub). Resolves to
+    /// com.microsoft.windows-executable via the extension lookup.
+    static let exeArchive = UTType(filenameExtension: "exe") ?? .data
     /// JoiPlay archive. Declared via `exportedAs` in Info.plist so
     /// Files.app can open .jgp with us, but we look up the
     /// filename-extension-based UTType first so the document picker
@@ -35,7 +39,9 @@ struct DocumentPickerView: UIViewControllerRepresentable {
         // (folder: spinner forever) or silently no-ops (file: Open
         // does nothing). asCopy bypasses that whole grant flow.
         let picker = UIDocumentPickerViewController(
-            forOpeningContentTypes: [.folder, .zip, .sevenZArchive, .rarArchive, .jgpArchive],
+            forOpeningContentTypes: [
+                .folder, .zip, .sevenZArchive, .rarArchive, .jgpArchive, .exeArchive,
+            ],
             asCopy: true
         )
         picker.allowsMultipleSelection = true
