@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.12 - 2026-07-17
+
+### Bug Fixes
+
+- Migrate misjoined UserData saves and pin slash fix ([`4604767`](https://github.com/mateo-m/empo-app/commit/4604767f507275eb3c4aefe584bb331461152374))
+
+### Chores
+
+- Pin native-2026-07-17 with data_directory slash fix ([`c8af7a8`](https://github.com/mateo-m/empo-app/commit/c8af7a88d42842ea92c5b0358aa1706738706372))
+
 ## 0.2.11 - 2026-07-16
 
 ### Chores
