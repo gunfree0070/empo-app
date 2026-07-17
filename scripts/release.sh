@@ -161,7 +161,7 @@ if [[ -z "${CHANGELOG//[$' \t\r\n']/}" ]]; then
     exit 1
 fi
 
-RELEASE_NOTES=$(printf "## What's changed\n\n%s\n\n---\n> Unsigned build - resign with [SideStore](https://sidestore.io), AltStore, or Sideloadly before installing." "$CHANGELOG")
+RELEASE_NOTES=$(printf "## What's changed\n\n%s\n\n---\n> Unsigned build - sign the app with [SideStore](https://sidestore.io), [AltStore (Classic)](https://altstore.io), or [Sideloadly](https://sideloadly.io) before installing." "$CHANGELOG")
 
 # 8. Commit + tag (signed). Tag the release metadata first so the IPA
 # build below runs from a clean tree and bakes the release commit hash
