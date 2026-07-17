@@ -23,6 +23,15 @@
       ],
       "versions": [
         {
+          "version": "0.2.12",
+          "buildVersion": "435",
+          "date": "2026-07-17",
+          "localizedDescription": "### Bug Fixes\n\n- Migrate misjoined UserData saves and pin slash fix ([`4604767`](https://github.com/mateo-m/empo-app/commit/4604767f507275eb3c4aefe584bb331461152374))\n\n### Chores\n\n- Pin native-2026-07-17 with data_directory slash fix ([`c8af7a8`](https://github.com/mateo-m/empo-app/commit/c8af7a88d42842ea92c5b0358aa1706738706372))",
+          "downloadURL": "https://github.com/mateo-m/empo-app/releases/download/v0.2.12/Empo-0.2.12-unsigned.ipa",
+          "size": 16454974,
+          "minOSVersion": "26.0"
+        },
+        {
           "version": "0.2.11",
           "buildVersion": "431",
           "date": "2026-07-16",
