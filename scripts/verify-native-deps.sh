@@ -66,6 +66,23 @@ for ver in 18 19 31; do
         fail "mkxp${ver}-merged.o missing ${sym}"
 done
 
+# Networking: every VM must carry the statically-linked socket ext
+# (Init_socket is hidden to a local symbol inside the merged object,
+# so look in the ext archives which are the merge inputs), and the
+# pure-Ruby stdlib trees the launcher bundles must exist.
+# awk (not `grep -q`) to drain nm's output: with pipefail, grep -q's
+# early exit SIGPIPEs nm and fails the pipeline on a *successful* match.
+for ext in libruby18-ext.a libruby19-ext.a "libruby.3.1-ext.a"; do
+    nm "$LIB/$ext" 2>/dev/null | awk '$2 == "T" && $3 == "_Init_socket" {found=1} END {exit !found}' ||
+        fail "$ext missing Init_socket (socket ext dropped out of the build)"
+done
+nm "$LIB/libruby.3.1-ext.a" 2>/dev/null | awk '$2 == "T" && $3 == "_Init_openssl" {found=1} END {exit !found}' ||
+    fail "libruby.3.1-ext.a missing Init_openssl"
+for tree in 3.1.0/net/http.rb 3.1.0/openssl.rb 1.9.1/uri.rb 1.8/uri.rb; do
+    [ -f "$REPO_ROOT/ios/Dependencies/build-${PLATFORM}-arm64/ruby-stdlib/$tree" ] ||
+        fail "ruby-stdlib/$tree missing (run: make -f ${PLATFORM}.make ruby-stdlib)"
+done
+
 for name in libruby.3.1-static.a libruby.3.1-ext.a libruby18-static.a libruby18-ext.a \
     libruby19-static.a libruby19-ext.a libcrypto.a libssl.a libSDL2.a libSDL2_ttf.a; do
     path="$LIB/$name"

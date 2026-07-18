@@ -19,10 +19,19 @@
  *   - `thread` is no longer a separate ext in 1.9 (folded into core)
  *   - `pathname` is included since Pokemon Essentials uses it
  *
- * Keep this list in sync with $RUBY19_EXTS in common.make.
+ * Keep this list in sync with $RUBY19_EXTS in common.make, plus the
+ * special-cased socket ext ($SOCKET19_SRCS / $SOCKET19_DEFS there -
+ * it needs generated constdefs.c and pinned Darwin extconf results,
+ * so it doesn't ride the simple per-ext loop).
  */
 
+#include <stdbool.h>
+
 void ruby_init_ext(const char *name, void (*init)(void));
+
+/* Host bridge (mkxp-z-apple-mobile/src/app_bridge.h), resolved at app
+ * link time. */
+bool mkxp_getNetworkEnabled(void);
 
 void Init_zlib(void);
 void Init_stringio(void);
@@ -30,6 +39,7 @@ void Init_strscan(void);
 void Init_digest(void);
 void Init_fcntl(void);
 void Init_pathname(void);
+void Init_socket(void);
 
 void Init_ext(void)
 {
@@ -39,4 +49,13 @@ void Init_ext(void)
     ruby_init_ext("digest.so", Init_digest);
     ruby_init_ext("fcntl.so", Init_fcntl);
     ruby_init_ext("pathname.so", Init_pathname);
+
+    /* Only define the real socket classes when the host allows this
+     * game onto the network. Some Pokemon Essentials forks ship their
+     * own TCPSocket/UDPSocket class hierarchies; with the toggle off
+     * the VM must look exactly like the pre-networking builds (no
+     * socket constants at all) so those scripts keep loading without
+     * superclass mismatches. */
+    if (mkxp_getNetworkEnabled())
+        ruby_init_ext("socket.so", Init_socket);
 }

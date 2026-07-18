@@ -19,15 +19,25 @@
  * extension requires three changes: (1) add it to RUBY18_EXTS, (2)
  * declare and call its Init_X here, (3) make sure the extension
  * configures cleanly (some need extconf-time tweaks for iOS).
+ *
+ * socket is special-cased outside $RUBY18_EXTS (single socket.c with
+ * pinned Darwin extconf results - see $SOCKET18_DEFS in common.make).
  */
 
+#include <stdbool.h>
+
 void ruby_init_ext(const char *name, void (*init)(void));
+
+/* Host bridge (mkxp-z-apple-mobile/src/app_bridge.h), resolved at app
+ * link time. */
+bool mkxp_getNetworkEnabled(void);
 
 void Init_zlib(void);
 void Init_stringio(void);
 void Init_strscan(void);
 void Init_digest(void);
 void Init_fcntl(void);
+void Init_socket(void);
 
 void Init_ext(void)
 {
@@ -36,4 +46,10 @@ void Init_ext(void)
     ruby_init_ext("strscan.so", Init_strscan);
     ruby_init_ext("digest.so", Init_digest);
     ruby_init_ext("fcntl.so", Init_fcntl);
+
+    /* Gated like the 1.9 extinit: with networking off, the VM must
+     * look exactly like pre-networking builds (no socket constants)
+     * so games shipping their own TCPSocket hierarchies keep working. */
+    if (mkxp_getNetworkEnabled())
+        ruby_init_ext("socket.so", Init_socket);
 }

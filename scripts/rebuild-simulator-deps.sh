@@ -42,6 +42,9 @@ echo "==> building Ruby 3.1 extensions + mkxp merged (via common.make)"
 rm -f "$LIB/libruby.3.1-ext.a"
 make -f iphonesimulator.make "$LIB/libruby.3.1-ext.a"
 
+echo "==> installing pure-Ruby stdlib subsets"
+make -f iphonesimulator.make ruby-stdlib
+
 echo "==> building mkxp{18,19,31}-merged.o"
 make -f iphonesimulator.make mkxp-merged
 
