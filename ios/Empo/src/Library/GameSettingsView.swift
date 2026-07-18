@@ -446,6 +446,13 @@ struct GameSettingsView: View {
                     "Tell the game it's running on JoiPlay ($joiplay). Some games then use mobile-friendly code paths, but games patched for JoiPlay's older engine may misbehave. Enable if the game errors on features its desktop version reserves for PC."
             )
 
+            SettingsToggle(
+                title: "Network access",
+                isOn: networkEnabledBinding,
+                description:
+                    "Let this game use the internet for update checks, downloads, and online features. When off, the game sees the device as offline (the previous behavior)."
+            )
+
             VStack(alignment: .leading, spacing: Spacing.xs) {
                 Picker("Ruby version", selection: rubyVersionBinding) {
                     Text(autoDetectLabel).tag(RubyVersionPick.auto)
@@ -612,6 +619,13 @@ struct GameSettingsView: View {
         Binding(
             get: { settings.useInGameKeyboard ?? isPokemonEssentialsDefault },
             set: { settings.useInGameKeyboard = $0 }
+        )
+    }
+
+    private var networkEnabledBinding: Binding<Bool> {
+        Binding(
+            get: { settings.networkEnabled ?? true },
+            set: { settings.networkEnabled = $0 }
         )
     }
 

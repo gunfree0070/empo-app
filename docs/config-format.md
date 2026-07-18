@@ -51,6 +51,17 @@ If import-time parsing disagrees with engine runtime parsing for the same file:
 2. Update this doc and either widen `JSON5LiteParser` or simplify the authored file.
 3. Prefer keeping host output strict JSON-with-`//`-comments.
 
+## Session flags outside mkxp.json
+
+Network access is **not** an `mkxp.json` key: it is a per-boot host bridge
+flag (`MKXPSessionConfig.networkEnabled`, from the per-game "Network access"
+setting, default on). Game scripts and patches can branch on it via
+`System.network_enabled?` — when false, the preload layer simulates an
+offline device (network stdlib requires are absorbed, `HTTP.download`
+fakes success, postload online stubs apply). The TLS trust store is also
+host-provided (`mkxp_setCABundlePath`, exported to Ruby as
+`SSL_CERT_FILE`).
+
 ## References
 
 - `ios/Empo/src/Library/JSON5LiteParser.swift`

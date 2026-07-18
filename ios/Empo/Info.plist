@@ -45,6 +45,8 @@
 	<string>Game controllers may connect over Bluetooth.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Take a photo to use as custom game artwork or banner.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Some games offer local multiplayer, which needs permission to find other players on your network.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

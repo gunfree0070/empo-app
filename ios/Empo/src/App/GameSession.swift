@@ -63,6 +63,7 @@ enum GameSession {
                 config.postloadEnabled = postload
                 config.useInGameKeyboard = settings.useInGameKeyboard ?? inGameKeyboardDefault
                 config.joiplayCompat = settings.joiplayCompat ?? false
+                config.networkEnabled = settings.networkEnabled ?? true
                 mkxp_applySessionConfig(&config)
             }
         }

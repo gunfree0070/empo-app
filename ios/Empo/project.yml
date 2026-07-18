@@ -91,6 +91,10 @@ settings:
       - 'MKXPZ_VERSION="\"1.0.0\""'
       - 'MKXPZ_GIT_HASH="\"ios\""'
       - 'MKXPZ_RUBY_VERSION="\"3.1\""'
+      # TLS for the in-engine HTTP client (src/net/net.cpp). NOT the
+      # upstream MKXPZ_SSL flag - that one also toggles xBRZ shader
+      # paths we don't build; see the comment in net.cpp.
+      - MKXPZ_NET_TLS
       - MKXPZ_HAVE_SYNTAX_TRANSFORM_PATCHES
       - GLES2_HEADER
       - MKXPZ_HAS_ANGLE
@@ -170,6 +174,9 @@ targets:
           # Loose assets
           cp "$ENGINE"/assets/gamecontrollerdb.txt "$BUNDLE/"
           cp "$ENGINE"/assets/icon.png             "$BUNDLE/"
+          # Mozilla CA root bundle: TLS trust store for the native
+          # HTTP client and Ruby's openssl (via SSL_CERT_FILE).
+          cp "$ENGINE"/assets/cacert.pem           "$BUNDLE/"
 
           # Preload scripts
           mkdir -p "$BUNDLE/Preload"
@@ -200,6 +207,22 @@ targets:
           rm -rf "$BUNDLE/SplashIcons"
           mkdir -p "$BUNDLE/SplashIcons"
           cp "${PROJECT_DIR}/curated-splash-icons/"*.svg "$BUNDLE/SplashIcons/"
+      - name: Assemble Ruby stdlib
+        # Pure-Ruby stdlib subsets from the prebuilt dep tree, landing
+        # at Empo.app/Ruby/{3.1.0,1.9.1,1.8}. The engine pushes the
+        # per-VM directory onto $LOAD_PATH (binding-mri.cpp), which is
+        # what makes `require 'net/http'` etc. resolve in games.
+        # Force every build: content follows the fetched deps version,
+        # not any file Xcode tracks.
+        basedOnDependencyAnalysis: false
+        script: |
+          set -e
+          STDLIB_SRC="${PROJECT_DIR}/../Dependencies/build-${PLATFORM_NAME}-arm64/ruby-stdlib"
+          if [ ! -d "$STDLIB_SRC" ]; then
+            echo "error: $STDLIB_SRC missing - run: cd ios/Dependencies && make -f ${PLATFORM_NAME}.make ruby-stdlib (or refetch native deps)" >&2
+            exit 1
+          fi
+          rsync -a --delete "$STDLIB_SRC/" "${PROJECT_DIR}/Ruby/"
       - name: Generate Git Info
         # Force this script to run every build. Without this, Xcode sees
         # the declared output file already on disk and skips the script,
@@ -344,6 +367,13 @@ targets:
       - path: Assets.bundle
         type: folder
         buildPhase: resources
+      # Populated by the "Assemble Ruby stdlib" script phase from the
+      # prebuilt dep tree; gitignored (content is versioned by the
+      # native-deps pin, not this repo).
+      - path: Ruby
+        type: folder
+        buildPhase: resources
+        optional: true
     # Code signing is configured via a local, untracked xcconfig
     # (Signing.xcconfig in this directory) so each machine can set
     # DEVELOPMENT_TEAM and optionally override PRODUCT_BUNDLE_IDENTIFIER

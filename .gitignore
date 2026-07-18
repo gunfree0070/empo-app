@@ -67,6 +67,10 @@ ios/Empo/Signing.xcconfig
 # Only .gitkeep is tracked to preserve the directory.
 ios/Empo/Assets.bundle/*
 !ios/Empo/Assets.bundle/.gitkeep
+
+# Bundled pure-Ruby stdlib, assembled at build time from the prebuilt
+# native-deps tree (see the "Assemble Ruby stdlib" phase in project.yml).
+ios/Empo/Ruby/
 # Node tool caches (CI uses bun + bun.lock instead).
 node_modules/
 

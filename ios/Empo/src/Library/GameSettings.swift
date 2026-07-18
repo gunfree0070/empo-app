@@ -237,6 +237,17 @@ struct GameSettings: Codable, Equatable {
     /// restart-required.
     @Setting<Bool?, RestartFlag> var joiplayCompat: Bool?
 
+    /// Let the game reach the network. On (the default), the engine's
+    /// network stack works like desktop mkxp-z: `require 'net/http'`
+    /// resolves against the bundled stdlib, HTTPLite streams real
+    /// downloads, and game update systems function. Off restores the
+    /// historical offline illusion (the game believes the device has
+    /// no connection). Routes through
+    /// `MKXPSessionConfig.networkEnabled`; the preload layer reads it
+    /// via `System.network_enabled?` before game scripts load - hence
+    /// restart-required.
+    @Setting<Bool?, RestartFlag> var networkEnabled: Bool?
+
     private static let settingsFilename = "game_settings.json"
 
     /// Read the game's settings sidecar from `<container>/EmpoState/`
@@ -325,6 +336,7 @@ struct GameSettings: Codable, Equatable {
         case "useModernRuby": return "Ruby compatibility mode"
         case "rubyVersionOverride": return "Ruby version"
         case "joiplayCompat": return "JoiPlay compatibility"
+        case "networkEnabled": return "Network access"
         default:
             // Surface the raw camelCase name so the missing mapping
             // is visible in the UI rather than silently dropped.

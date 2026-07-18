@@ -52,6 +52,16 @@ final class EngineSessionCoordinator {
         // Game scripts see `$userAgent = "empo"` and `$empo = true`,
         // alongside the engine's JoiPlay-compat `$joiplay`.
         mkxp_setLauncherIdentity("empo")
+        // TLS trust store for the engine's networking (native HTTP
+        // client + Ruby openssl via SSL_CERT_FILE). Without it, TLS
+        // fails closed - plain http still works.
+        if let caPath = Bundle.main.path(forResource: "cacert", ofType: "pem", inDirectory: "Assets.bundle") {
+            mkxp_setCABundlePath(caPath)
+        } else {
+            // Bundle assembly must have skipped the CA store; catch in
+            // development, fail closed (no TLS) in release.
+            assertionFailure("cacert.pem missing from Assets.bundle")
+        }
         registerBridgeCallbacks()
         installInputBridgesIfNeeded()
     }
