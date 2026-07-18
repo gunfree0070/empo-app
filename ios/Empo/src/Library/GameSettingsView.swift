@@ -450,7 +450,7 @@ struct GameSettingsView: View {
                 title: "Network access",
                 isOn: networkEnabledBinding,
                 description:
-                    "Let this game use the internet for update checks, downloads, and online features. When off, the game sees the device as offline (the previous behavior)."
+                    "Let this game use the internet for update checks, downloads, and online features. When off, the game behaves as if the device were in airplane mode."
             )
 
             VStack(alignment: .leading, spacing: Spacing.xs) {

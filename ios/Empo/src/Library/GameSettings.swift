@@ -240,9 +240,10 @@ struct GameSettings: Codable, Equatable {
     /// Let the game reach the network. On (the default), the engine's
     /// network stack works like desktop mkxp-z: `require 'net/http'`
     /// resolves against the bundled stdlib, HTTPLite streams real
-    /// downloads, and game update systems function. Off restores the
-    /// historical offline illusion (the game believes the device has
-    /// no connection). Routes through
+    /// downloads, and game update systems function. Off simulates
+    /// airplane mode: libraries still load, but every connection
+    /// attempt fails the way it does with no connectivity, so games
+    /// take their own offline fallback paths. Routes through
     /// `MKXPSessionConfig.networkEnabled`; the preload layer reads it
     /// via `System.network_enabled?` before game scripts load - hence
     /// restart-required.

@@ -56,11 +56,14 @@ If import-time parsing disagrees with engine runtime parsing for the same file:
 Network access is **not** an `mkxp.json` key: it is a per-boot host bridge
 flag (`MKXPSessionConfig.networkEnabled`, from the per-game "Network access"
 setting, default on). Game scripts and patches can branch on it via
-`System.network_enabled?` — when false, the preload layer simulates an
-offline device (network stdlib requires are absorbed, `HTTP.download`
-fakes success, postload online stubs apply). The TLS trust store is also
-host-provided (`mkxp_setCABundlePath`, exported to Ruby as
-`SSL_CERT_FILE`).
+`System.network_enabled?` — when false, the game sees the equivalent of
+airplane mode: network libraries load and their classes exist, but the
+native client refuses requests, socket connects raise `Errno::ENETDOWN`,
+and downloads report failure, so games take the same offline fallback
+paths they ship for desktop players without internet. (Postload stubs for
+Windows-only online modules still apply while offline.) The TLS trust
+store is host-provided (`mkxp_setCABundlePath`, exported to Ruby as
+`SSL_CERT_FILE`) and silently refreshed by the launcher.
 
 ## References
 

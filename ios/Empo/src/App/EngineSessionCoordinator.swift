@@ -54,13 +54,21 @@ final class EngineSessionCoordinator {
         mkxp_setLauncherIdentity("empo")
         // TLS trust store for the engine's networking (native HTTP
         // client + Ruby openssl via SSL_CERT_FILE). Without it, TLS
-        // fails closed - plain http still works.
-        if let caPath = Bundle.main.path(forResource: "cacert", ofType: "pem", inDirectory: "Assets.bundle") {
+        // fails closed - plain http still works. CABundleStore keeps
+        // the store silently refreshed; the native client re-reads
+        // the path per request, so a refresh landing mid-run applies
+        // to that side immediately (Ruby picks it up next session).
+        if let caPath = CABundleStore.effectivePath {
             mkxp_setCABundlePath(caPath)
         } else {
             // Bundle assembly must have skipped the CA store; catch in
             // development, fail closed (no TLS) in release.
             assertionFailure("cacert.pem missing from Assets.bundle")
+        }
+        CABundleStore.refreshIfStale {
+            if let caPath = CABundleStore.effectivePath {
+                mkxp_setCABundlePath(caPath)
+            }
         }
         registerBridgeCallbacks()
         installInputBridgesIfNeeded()
