@@ -336,10 +336,13 @@ $(SOURCES)/openal-soft/$(CMAKE_BUILDDIR)/Makefile: $(SOURCES)/openal-soft/CMakeL
 	-DALSOFT_BACKEND_WAVE=OFF
 
 
-# OpenSSL 1.1.x (static) — linked by Empo via -lssl -lcrypto in project.yml.
+# OpenSSL (static) — linked by Empo via -lssl -lcrypto in project.yml.
 # Ruby's openssl ext is merged into mkxp31-merged.o; the app also links these
-# archives directly. Pin 1.1.1w to match the previously hand-built libs.
-OPENSSL_VERSION := 1.1.1w
+# archives directly.
+# 3.5 is the current OpenSSL LTS (supported until 2030); 1.1.1 went
+# EOL in 2023. Ruby 3.1's bundled openssl gem (3.0.x) and the vendored
+# cpp-httplib both speak 3.x.
+OPENSSL_VERSION := 3.5.7
 OPENSSL_DIR := $(DOWNLOADS)/openssl-$(OPENSSL_VERSION)
 OPENSSL_CONFIGURE_TARGET := ios64-xcrun
 OPENSSL_CONFIGURE_FLAGS := -miphoneos-version-min=$(MINIMUM_REQUIRED)
@@ -364,6 +367,7 @@ $(OPENSSL_CONFIGURED): $(OPENSSL_DIR)/Configure
 	cd $(OPENSSL_DIR); \
 	./Configure $(OPENSSL_CONFIGURE_TARGET) no-shared no-dso \
 		--prefix="$(BUILD_PREFIX)" \
+		--libdir=lib \
 		--openssldir="$(BUILD_PREFIX)/ssl" \
 		$(OPENSSL_CONFIGURE_FLAGS)
 	touch $@
@@ -373,7 +377,7 @@ $(OPENSSL_DIR)/Configure: $(DOWNLOADS)/openssl-$(OPENSSL_VERSION).tar.gz
 
 $(DOWNLOADS)/openssl-$(OPENSSL_VERSION).tar.gz:
 	@mkdir -p $(DOWNLOADS)
-	curl -L -o $@ https://github.com/openssl/openssl/releases/download/OpenSSL_1_1_1w/openssl-$(OPENSSL_VERSION).tar.gz
+	curl -L -o $@ https://github.com/openssl/openssl/releases/download/openssl-$(OPENSSL_VERSION)/openssl-$(OPENSSL_VERSION).tar.gz
 
 
 # Freetype (submodule: sources/freetype)

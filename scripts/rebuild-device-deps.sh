@@ -18,7 +18,7 @@ for d in sources/ruby sources/ruby19 sources/ruby18 sources/sdl2_ttf sources/fre
 done
 
 echo "==> removing device build output and per-SDK configure stamps"
-OPENSSL_DIR="$DEPS/downloads/aarch64-apple-darwin/openssl-1.1.1w"
+OPENSSL_DIR="$DEPS/downloads/aarch64-apple-darwin/openssl-3.5.7"
 if [[ -f "$OPENSSL_DIR/Makefile" ]]; then
     make -C "$OPENSSL_DIR" distclean >/dev/null 2>&1 || true
 fi
