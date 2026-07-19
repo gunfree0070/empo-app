@@ -6,7 +6,15 @@
 // once we add one. Top-level "rpgm" array of {key, value} objects.
 // Keys prefixed with "[regex]" use std::regex_replace ECMAScript syntax.
 //
-// Currently empty. Add cross-game patches here as we discover them.
 {
-  "rpgm": []
+  "rpgm": [
+    {
+      "key": "[regex]def pbGetTimeNow\\b[\\s\\S]*?\\nend\\b",
+      "value": "def pbGetTimeNow\n  return Time.now\nend"
+    },
+    {
+      "key": "[regex]Graphics\\.frame_rate\\s*=\\s*\\d+",
+      "value": "Graphics.frame_rate = 40"
+    }
+  ]
 }
