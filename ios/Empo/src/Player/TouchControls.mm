@@ -88,10 +88,38 @@ static int scancodeForCharacter(unichar c) {
 @end
 
 @implementation TCAccessoryBar
-// TODO: Handle safe area insets for standalone accessory bar (no native keyboard).
-// UIKit controls the input accessory view frame and ignores dynamic resizing.
-// Needs a different approach — possibly recreating with correct height or
-// not using inputAccessoryView at all.
+// UIKit controls the input accessory view's frame (height is fixed at
+// creation; dynamic resizing is ignored), but horizontal safe areas
+// still propagate to it. In landscape the bar spans edge to edge, so
+// without this the leading buttons sit under the notch / Dynamic
+// Island. Inset each row to the safe area and center its content
+// when it fits, mirroring how the system keyboard centers its keys.
+- (void)layoutSubviews {
+    [super layoutSubviews];
+
+    UIEdgeInsets safe = self.safeAreaInsets;
+    CGFloat availX = safe.left;
+    CGFloat availW = self.bounds.size.width - safe.left - safe.right;
+    if (availW <= 0)
+        return;
+
+    for (UIView *sub in self.subviews) {
+        if (![sub isKindOfClass:[UIScrollView class]])
+            continue;
+        UIScrollView *row = (UIScrollView *)sub;
+
+        CGRect f = row.frame;
+        f.origin.x = availX;
+        f.size.width = availW;
+        row.frame = f;
+
+        // Center short content; keep flush-left (scrollable) overflow.
+        CGFloat pad = MAX(0, (availW - row.contentSize.width) / 2);
+        row.contentInset = UIEdgeInsetsMake(0, pad, 0, pad);
+        if (pad > 0)
+            row.contentOffset = CGPointMake(-pad, 0);
+    }
+}
 @end
 
 UIView *TCCreateKeyboardAccessoryView(void) {
