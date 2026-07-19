@@ -78,6 +78,7 @@ enum GameSession {
             debugLogsEnabled: input.debugLogsEnabled
         )
 
+        mkxp_setFastForwardMultiplier(1)
         mkxp_resetSessionState()
     }
 
