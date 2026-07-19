@@ -96,6 +96,7 @@ final class EngineSessionCoordinator {
     /// Returns whether the engine thread was still running before terminate.
     func beginReturnToLibrary(selectedContainer: GameContainer?) -> Bool {
         clearPendingKeyHolds()
+        mkxp_setFastForwardMultiplier(1)
         recordSessionPlayTime(for: delegate?.coordinatorActiveSessionGame)
         if let selectedContainer {
             crashTracker.removeMarker(for: selectedContainer)

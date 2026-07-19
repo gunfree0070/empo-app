@@ -273,7 +273,7 @@ class ControlsLayout {
             label: "B", scancode: Int32(MKXP_SCANCODE_ESCAPE), relativeCenter: CGPoint(x: 0.86, y: 0.82),
             size: 56),
         ButtonModel(
-            label: "R", scancode: Int32(MKXP_SCANCODE_F5), relativeCenter: CGPoint(x: 0.89, y: 0.19),
+            label: "R", scancode: Int32(MKXP_SCANCODE_W), relativeCenter: CGPoint(x: 0.89, y: 0.19),
             size: 54),
         ButtonModel(
             label: "START", scancode: Int32(MKXP_SCANCODE_X), relativeCenter: CGPoint(x: 0.40, y: 0.91),
