@@ -229,6 +229,31 @@ index 8b16c2399..9dae2f137 100644
  void UIKit_ForceUpdateHomeIndicator()
  {
  #if !TARGET_OS_TV
+diff --git a/src/video/uikit/SDL_uikitviewcontroller.m b/src/video/uikit/SDL_uikitviewcontroller.m
+index 3baadd854..0a4e1d401 100644
+--- a/src/video/uikit/SDL_uikitviewcontroller.m
++++ b/src/video/uikit/SDL_uikitviewcontroller.m
+@@ -426,6 +426,20 @@ SDL_HideHomeIndicatorHintChanged(void *userdata, const char *name, const char *o
+ 
+ - (void)updateKeyboard
+ {
++    /* Empo: when the host app has reparented SDL's view into its own
++     * window (single-window compositing), the host owns the view's
++     * geometry. SDL's hidden UIWindow stops tracking rotation, so
++     * reassigning the frame from it here would stamp stale bounds
++     * onto the game surface every time the soft keyboard shows or
++     * hides, resizing/squashing the rendered game. */
++    if (window != NULL) {
++        SDL_WindowData *data = (__bridge SDL_WindowData *) window->driverdata;
++        if (data != nil && data.uiwindow != nil && self.view.window != nil &&
++            self.view.window != data.uiwindow) {
++            return;
++        }
++    }
++
+     CGAffineTransform t = self.view.transform;
+     CGPoint offset = CGPointMake(0.0, 0.0);
+     CGRect frame = UIKit_ComputeViewFrame(window, self.view.window.screen);
 diff --git a/src/video/uikit/SDL_uikitwindow.m b/src/video/uikit/SDL_uikitwindow.m
 index d69617983..233dec716 100644
 --- a/src/video/uikit/SDL_uikitwindow.m

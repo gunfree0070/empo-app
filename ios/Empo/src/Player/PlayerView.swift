@@ -172,6 +172,11 @@ struct PlayerView: View {
             }
         }
         .ignoresSafeArea()
+        // Opt out of SwiftUI keyboard avoidance: the soft keyboard
+        // must overlay the game/controls, never compress or shift
+        // them. Distinct from `.ignoresSafeArea()` above, which only
+        // covers the container regions.
+        .ignoresSafeArea(.keyboard)
         .background(Color.clear)
         .onAppear {
             // Engine fired SDL_StartTextInput / SDL_StopTextInput when
