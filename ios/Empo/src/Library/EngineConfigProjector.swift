@@ -74,6 +74,11 @@ enum EngineConfigProjector {
         if let v = settings.vsync { config["syncToRefreshrate"] = v }
         if let v = settings.pathCache { config["pathCache"] = v }
 
+        if GameMetadata.detectRGSSVersion(in: gameDirectory) == 1 {
+            config["fixedFramerate"] = 40
+            config["syncToRefreshrate"] = false
+        }
+
         config.removeValue(forKey: "defScreenW")
         config.removeValue(forKey: "defScreenH")
         if let scale = settings.renderScale {
