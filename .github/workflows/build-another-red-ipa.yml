@@ -38,6 +38,7 @@ jobs:
             -configuration Release \
             -sdk iphoneos \
             -destination "generic/platform=iOS" \
+            -derivedDataPath ios/Empo/build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
@@ -45,7 +46,7 @@ jobs:
 
       - name: Package IPA
         run: |
-          APP_PATH="$(find ios/Empo/build -type d -name Empo.app -print -quit)"
+          APP_PATH="$(find ios/Empo/build/Build/Products -type d -name Empo.app -print -quit)"
           if [ -z "$APP_PATH" ]; then
             echo "Empo.app was not produced" >&2
             exit 1
