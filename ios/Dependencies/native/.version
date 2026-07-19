@@ -1,3 +1,3 @@
 # Auto-updated by tools/package-native-deps.sh — commit with the release.
-NATIVE_DEPS_VERSION=native-2026-07-18-r2
-NATIVE_DEPS_SHA256=bf32ddedbdd444bac19850cd4cbe16e7a1869384f885956ff0044d53f8b9de44
+NATIVE_DEPS_VERSION=native-2026-07-19
+NATIVE_DEPS_SHA256=96eda677efc7bfa14830828171cdbab47d123449576121506061095c36e7d448
