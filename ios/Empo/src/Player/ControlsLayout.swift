@@ -234,7 +234,10 @@ class ControlsLayout {
     // value types; safe to read from any thread.
 
     nonisolated static let defaultDPadCenterPortrait = CGPoint(x: 0.13, y: 0.72)
-    nonisolated static let defaultDPadCenterLandscape = CGPoint(x: 0.10, y: 0.65)
+    // Landscape placement follows the supplied dual-screen handheld
+    // reference: low on the left with the face buttons mirrored on
+    // the right.
+    nonisolated static let defaultDPadCenterLandscape = CGPoint(x: 0.15, y: 0.72)
     nonisolated static let defaultDPadSize: CGFloat = 140
 
     /// Legacy alias. Some imports / migration paths still reference
@@ -257,21 +260,30 @@ class ControlsLayout {
             label: "B", scancode: Int32(MKXP_SCANCODE_B), relativeCenter: CGPoint(x: 0.88, y: 0.76), size: 56),
     ]
 
-    /// 2x2 button grid in the bottom-right of a landscape viewport.
-    /// Shorter screen height + wider screen width means the grid
-    /// can sit higher and more spread out without overlapping the
-    /// game viewport's center.
+    /// Pokémon Essentials preset for landscape play, arranged like
+    /// the supplied handheld reference image.
     nonisolated static let defaultButtonsLandscape: [ButtonModel] = [
         ButtonModel(
-            label: "Enter", scancode: Int32(MKXP_SCANCODE_RETURN), relativeCenter: CGPoint(x: 0.80, y: 0.59),
+            label: "Y", scancode: Int32(MKXP_SCANCODE_LSHIFT), relativeCenter: CGPoint(x: 0.77, y: 0.69),
             size: 56),
         ButtonModel(
-            label: "Escape", scancode: Int32(MKXP_SCANCODE_ESCAPE), relativeCenter: CGPoint(x: 0.88, y: 0.59),
+            label: "A", scancode: Int32(MKXP_SCANCODE_RETURN), relativeCenter: CGPoint(x: 0.94, y: 0.69),
             size: 56),
         ButtonModel(
-            label: "Z", scancode: Int32(MKXP_SCANCODE_Z), relativeCenter: CGPoint(x: 0.80, y: 0.75), size: 56),
+            label: "B", scancode: Int32(MKXP_SCANCODE_ESCAPE), relativeCenter: CGPoint(x: 0.86, y: 0.82),
+            size: 56),
         ButtonModel(
-            label: "B", scancode: Int32(MKXP_SCANCODE_B), relativeCenter: CGPoint(x: 0.88, y: 0.75), size: 56),
+            label: "R", scancode: Int32(MKXP_SCANCODE_F5), relativeCenter: CGPoint(x: 0.89, y: 0.19),
+            size: 54),
+        ButtonModel(
+            label: "START", scancode: Int32(MKXP_SCANCODE_X), relativeCenter: CGPoint(x: 0.40, y: 0.91),
+            size: 44),
+        ButtonModel(
+            label: "▲", scancode: Int32(MKXP_SCANCODE_TAB), relativeCenter: CGPoint(x: 0.505, y: 0.91),
+            size: 44),
+        ButtonModel(
+            label: "SELECT", scancode: Int32(MKXP_SCANCODE_Z), relativeCenter: CGPoint(x: 0.61, y: 0.91),
+            size: 44),
     ]
 
     /// Legacy alias for callers that grab "the" defaults without

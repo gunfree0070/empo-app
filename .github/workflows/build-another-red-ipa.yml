@@ -1,0 +1,65 @@
+name: Build Another Red IPA
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  build:
+    name: Unsigned iOS IPA
+    runs-on: macos-26
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout source and engine
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install project generator
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: |
+          cp ios/Empo/Signing.xcconfig.example ios/Empo/Signing.xcconfig
+          xcodegen generate --spec ios/Empo/project.yml --project ios/Empo
+
+      - name: Build unsigned device app
+        run: |
+          xcodebuild \
+            -project ios/Empo/Empo.xcodeproj \
+            -scheme Empo \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Package IPA
+        run: |
+          APP_PATH="$(find ios/Empo/build -type d -name Empo.app -print -quit)"
+          if [ -z "$APP_PATH" ]; then
+            echo "Empo.app was not produced" >&2
+            exit 1
+          fi
+          mkdir -p Payload
+          cp -R "$APP_PATH" Payload/AnotherRedPlayer.app
+          ditto -c -k --sequesterRsrc --keepParent Payload AnotherRedPlayer-unsigned.ipa
+          shasum -a 256 AnotherRedPlayer-unsigned.ipa > AnotherRedPlayer-unsigned.ipa.sha256
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnotherRedPlayer-unsigned
+          path: |
+            AnotherRedPlayer-unsigned.ipa
+            AnotherRedPlayer-unsigned.ipa.sha256
+          if-no-files-found: error
