@@ -5,6 +5,33 @@ import GameProbe
 /// build `GameEntry` values for the UI.
 enum GameCatalog {
 
+    /// Fast first-pass scan for launch. Builds displayable entries
+    /// (title, metadata, already-materialized artwork) but skips the
+    /// expensive per-container work: validation, orphan cleanup, PE
+    /// icon extraction, and Ruby script-profile detection. Entries
+    /// come back `.ready` even if a full scan would mark them
+    /// `.invalid`; the full `scanGames` pass that follows corrects
+    /// status and artwork in place.
+    nonisolated static func quickScanGames(
+        fm: FileManager = .default,
+        skipIDs: Set<String> = []
+    ) -> [GameEntry] {
+        var entries: [GameEntry] = []
+
+        for container in GameContainer.discover() {
+            if skipIDs.contains(container.id) { continue }
+            // Orphaned containers (no Game/ subdir) are skipped, not
+            // deleted - the full pass owns cleanup.
+            guard fm.fileExists(atPath: container.gameURL.path) else { continue }
+            if let entry = buildGameEntry(from: container, fm: fm, quick: true) {
+                entries.append(entry)
+            }
+        }
+
+        entries.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        return entries
+    }
+
     nonisolated static func scanGames(
         fm: FileManager = .default,
         cleanupInvalid: Bool,
@@ -56,19 +83,26 @@ enum GameCatalog {
         return entries
     }
 
+    /// `quick: true` builds an entry from cheap reads only (INI
+    /// title, metadata.json, artwork that already exists on disk),
+    /// skipping PE icon extraction and script-profile detection.
+    /// Used by `quickScanGames` for the launch fast path.
     nonisolated static func buildGameEntry(
         from container: GameContainer,
-        fm: FileManager = .default
+        fm: FileManager = .default,
+        quick: Bool = false
     ) -> GameEntry? {
         let iniTitle =
             GameINI.parseINIValue(at: container.gameURL, section: "game", key: "title")
             ?? "Unknown Game"
-        let defaultArtwork = findArtwork(in: container)
+        let defaultArtwork = quick ? quickFindArtwork(in: container) : findArtwork(in: container)
 
-        let settings = GameSettings.load(from: container.empoStateURL)
         var metadata = GameMetadata.load(from: container)
-        if settings.allowsRubyAutoDetectRefresh {
-            metadata.refreshDetectedProfile(in: container)
+        if !quick {
+            let settings = GameSettings.load(from: container.empoStateURL)
+            if settings.allowsRubyAutoDetectRefresh {
+                metadata.refreshDetectedProfile(in: container)
+            }
         }
 
         let baseTitle = metadata.baseTitle ?? iniTitle
@@ -108,6 +142,18 @@ enum GameCatalog {
         }
         if let sidecarPath = ExecutableIconExtractor.writeSidecarIfPossible(in: container) {
             return sidecarPath
+        }
+        return findTitlesArtwork(in: container.gameURL)
+    }
+
+    /// Artwork resolution minus the expensive fallback: checks the
+    /// exe-icon sidecar and Graphics/Titles, but never runs the PE
+    /// resource extraction `findArtwork` may perform for games
+    /// imported before sidecars existed.
+    nonisolated static func quickFindArtwork(in container: GameContainer) -> String? {
+        let sidecar = container.exeIconSidecarURL
+        if FileManager.default.fileExists(atPath: sidecar.path) {
+            return sidecar.path
         }
         return findTitlesArtwork(in: container.gameURL)
     }

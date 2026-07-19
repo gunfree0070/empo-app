@@ -94,8 +94,14 @@ struct GameLibraryView: View {
         library.pendingValidationCatalog()
     }
 
+    /// True only once the initial scan has confirmed the library is
+    /// actually empty. Before the scan lands, `games.isEmpty` means
+    /// "unknown", and asserting emptiness flashed the empty state on
+    /// slow launches (Low Power Mode, thermal throttling) and on
+    /// crash-recovery launches where no splash hides it. While
+    /// unknown, neither the empty state nor the grid renders.
     private var showEmpty: Bool {
-        library.games.isEmpty
+        library.initialScanCompleted && library.games.isEmpty
     }
 
     private var recentlyPlayed: GameEntry? {
@@ -253,7 +259,10 @@ struct GameLibraryView: View {
     private var headerInset: some View {
         VStack(spacing: Spacing.md) {
             libraryHeader
-            if !showEmpty {
+            // Keyed on games directly (not showEmpty) so the search
+            // bar doesn't flash in during the pre-scan window when
+            // emptiness is still unknown.
+            if !library.games.isEmpty {
                 searchBar
             }
         }

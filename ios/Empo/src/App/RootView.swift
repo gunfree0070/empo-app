@@ -2,6 +2,12 @@ import SwiftUI
 
 private enum SplashTiming {
     static let holdDuration: TimeInterval = 1.2
+    /// Extra time after the hold to keep the splash up while the
+    /// initial library scan finishes, so dismissal never reveals an
+    /// in-between library (blank, or empty-state-then-snap). Capped
+    /// so a pathological scan can't hold the splash hostage - past
+    /// this, the library's own pre-scan blank state takes over.
+    static let scanGraceDuration: TimeInterval = 2.5
     static let cycleDuration: TimeInterval = 3
 }
 
@@ -10,6 +16,7 @@ struct RootView: View {
     @Environment(\.engineState) private var engineState
     @Environment(\.controlsLayout) private var layout
     @Environment(\.appSettings) private var settings
+    @Environment(\.gameLibrary) private var library
     @Namespace private var hero
     @State private var showSplash: Bool
     @State private var splashExiting = false
@@ -100,11 +107,15 @@ struct RootView: View {
                 // Hold the splash open: fade the logo out (by entering
                 // the "exiting" visual but without dismissing the
                 // container) and reveal the disclaimer. The normal
-                // dismissal runs once the user acknowledges.
+                // dismissal runs once the user acknowledges. No scan
+                // gating here - reading the disclaimer dwarfs the
+                // scan, and the library's pre-scan blank state covers
+                // the residual case.
                 withAnimation(Motion.gentle) {
                     showDisclaimer = true
                 }
             } else {
+                await waitForInitialLibraryScan()
                 dismissSplash()
             }
         }
@@ -233,6 +244,21 @@ struct RootView: View {
     /// (we don't call `exit()` per App Store guideline 2.5.1).
     private var engineHung: Bool {
         mkxp_isEngineHung() != 0
+    }
+
+    /// Wait (up to `scanGraceDuration`) for the initial library scan
+    /// so the splash lifts on a settled library instead of a blank or
+    /// soon-to-snap one. Polling at 50ms is invisible at splash
+    /// timescales and avoids threading continuation plumbing through
+    /// GameLibrary; bails early if the hosting `.task` is cancelled.
+    private func waitForInitialLibraryScan() async {
+        let deadline = ContinuousClock.now + .seconds(SplashTiming.scanGraceDuration)
+        while !library.initialScanCompleted,
+            ContinuousClock.now < deadline,
+            !Task.isCancelled
+        {
+            try? await Task.sleep(for: .milliseconds(50))
+        }
     }
 
     /// Normal splash exit: fade background + logo + any disclaimer that

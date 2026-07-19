@@ -74,6 +74,15 @@ class GameLibrary {
     static let shared = GameLibrary()
 
     var games: [GameEntry] = []
+
+    /// False until the first catalog pass of this launch has been
+    /// merged into `games`. Distinguishes "not scanned yet" from
+    /// "scanned and truly empty": before this flips, `games.isEmpty`
+    /// means *unknown*, and the UI must not show the empty state.
+    /// (The flash was visible under Low Power Mode / heavy load, and
+    /// on crash-recovery launches where no splash hides it.)
+    var initialScanCompleted = false
+
     var pendingImports: [String: PendingImport] = [:]
     var nextPendingImportOrder = 0
 
@@ -108,36 +117,64 @@ class GameLibrary {
             ? UserDefaults.standard.bool(forKey: DefaultsKey.cleanupInvalidGames)
             : false
         let skipIDs = inFlightImports.withLock { Set($0) }
-        Task.detached {
+        // .userInitiated: the initial scan gates first meaningful
+        // paint (library vs empty state), and later reloads refresh
+        // what's on screen. The default detached priority gets
+        // deprioritized under system load - exactly when the scan
+        // is slowest and the priority matters most.
+        Task.detached(priority: .userInitiated) {
+            if initialLoad {
+                // Fast pass: titles + metadata + already-extracted
+                // artwork, no validation / PE icon extraction /
+                // script-profile detection. Gets real cards (and
+                // the emptiness answer) on screen quickly; the full
+                // pass below corrects status and artwork in place.
+                let quick = ImportSignpost.interval("library-quick-scan", id: "reload") {
+                    GameCatalog.quickScanGames(skipIDs: skipIDs)
+                }
+                await MainActor.run {
+                    GameLibrary.shared.applyScanResults(quick)
+                }
+            }
+
             let scanned = ImportSignpost.interval("library-scan", id: "reload") {
                 GameCatalog.scanGames(
                     cleanupInvalid: cleanupInvalid,
                     skipIDs: skipIDs
                 )
             }
-            let scannedByID = Dictionary(uniqueKeysWithValues: scanned.map { ($0.id, $0) })
-
             await MainActor.run {
-                let lib = GameLibrary.shared
-                withAnimation {
-                    var updatedIDs = Set<String>()
-                    for i in lib.games.indices {
-                        let id = lib.games[i].id
-                        if let fresh = scannedByID[id] {
-                            if lib.games[i] != fresh {
-                                lib.games[i] = fresh
-                            }
-                            updatedIDs.insert(id)
-                        }
-                    }
+                GameLibrary.shared.applyScanResults(scanned)
+            }
+        }
+    }
 
-                    lib.games.removeAll { !$0.isImporting && !scannedByID.keys.contains($0.id) }
-
-                    for entry in scanned where !updatedIDs.contains(entry.id) {
-                        lib.games.append(entry)
+    /// Merge a scan's results into `games`: refresh matching entries
+    /// in place, drop non-importing entries the scan no longer sees,
+    /// append newcomers. Marks the initial scan complete since any
+    /// applied pass answers the emptiness question.
+    private func applyScanResults(_ scanned: [GameEntry]) {
+        let scannedByID = Dictionary(uniqueKeysWithValues: scanned.map { ($0.id, $0) })
+        withAnimation {
+            var updatedIDs = Set<String>()
+            for i in games.indices {
+                let id = games[i].id
+                if let fresh = scannedByID[id] {
+                    if games[i] != fresh {
+                        games[i] = fresh
                     }
+                    updatedIDs.insert(id)
                 }
             }
+
+            games.removeAll { !$0.isImporting && !scannedByID.keys.contains($0.id) }
+
+            for entry in scanned where !updatedIDs.contains(entry.id) {
+                games.append(entry)
+            }
+        }
+        if !initialScanCompleted {
+            initialScanCompleted = true
         }
     }
 
