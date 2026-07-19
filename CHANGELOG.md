@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.2.13 - 2026-07-19
+
+### Bug Fixes
+
+- Keyboard no longer resizes the embedded game view ([`8fe929f`](https://github.com/mateo-m/empo-app/commit/8fe929f33e2996c897d018b9a60426b3d1decf3f))
+- Inset and center keyboard accessory rows within the horizontal safe area ([`075367c`](https://github.com/mateo-m/empo-app/commit/075367c83d52de72378da963df3e87b88105ab47))
+
+### Chores
+
+- Pin native-2026-07-18 ([`b6c9e1e`](https://github.com/mateo-m/empo-app/commit/b6c9e1e8becb2c270005e8eb38505b205b26926e))
+- Pin native-2026-07-18-r2 ([`975ec13`](https://github.com/mateo-m/empo-app/commit/975ec130ce7a8748e91b73f344f41a99257d871e))
+- Bump mkxp-z-apple-mobile (rubocop cache ignore) ([`def3661`](https://github.com/mateo-m/empo-app/commit/def3661c900ff46cfc6a8be86cb875ec2e9a3eff))
+- Bump mkxp-z-apple-mobile (stale path-cache fallback for runtime-written files) ([`55f8484`](https://github.com/mateo-m/empo-app/commit/55f84847becb0f9aa697fa5a495d038196e0b902))
+- Bump mkxp-z-apple-mobile (apply_overrides UTF-8 encoding fix) ([`7d8029c`](https://github.com/mateo-m/empo-app/commit/7d8029c6207426779d9290243f5bebaf48de5802))
+- Pin native-2026-07-19 ([`fbae312`](https://github.com/mateo-m/empo-app/commit/fbae31262a1b175c8051563cf7dc52a9574c5893))
+
+### Features
+
+- Socket exts for all three Rubies + bundled pure-Ruby stdlib trees ([`a341e8f`](https://github.com/mateo-m/empo-app/commit/a341e8f054547f7ac03bb1921ad8f138faff02cf))
+- Per-game network access toggle, CA bundle wiring, Ruby stdlib bundling ([`c633997`](https://github.com/mateo-m/empo-app/commit/c633997352b54d5d52cc5700d8fa4c731ca8309e))
+- Upgrade OpenSSL 1.1.1w -> 3.5.7 LTS ([`8325d49`](https://github.com/mateo-m/empo-app/commit/8325d4977e354ff362797dc8a4193dfe1758695f))
+- Silent weekly CA bundle auto-refresh + airplane-mode toggle copy ([`f5f18d3`](https://github.com/mateo-m/empo-app/commit/f5f18d32deedaf02e45ccef15e20ecf7097ca6f7))
+- Quick first-pass scan so the splash lifts on a settled library ([`34acf7b`](https://github.com/mateo-m/empo-app/commit/34acf7b773a03d5e703077670e1be6921fad298b))
+
+### Release
+
+- Link AltStore and Sideloadly in notes ([`abb097f`](https://github.com/mateo-m/empo-app/commit/abb097f8ed7dc3ea341f4ecd5a67df02d1ed61fc))
+
 ## 0.2.12 - 2026-07-17
 
 ### Bug Fixes
